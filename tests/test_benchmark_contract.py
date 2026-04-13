@@ -256,6 +256,52 @@ def test_execution_fingerprint_changes_when_chunking_changes_but_snapshot_stays_
     )
 
 
+def test_execution_fingerprint_uses_config_model_when_present(monkeypatch, tmp_path):
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    config = AppConfig(project_root=tmp_path, llm=LLMConfig(provider="openai-compatible", model_name="cfg-model"))
+
+    fingerprint_a = compute_execution_fingerprint(config=config, system="rag")
+    fingerprint_b = compute_execution_fingerprint(config=config, system="rag")
+
+    assert fingerprint_a == fingerprint_b
+
+
+def test_execution_fingerprint_uses_env_model_when_config_model_missing(monkeypatch, tmp_path):
+    monkeypatch.setenv("LLM_MODEL", "env-model")
+    llm_config = LLMConfig.model_construct(
+        provider="openai-compatible",
+        model_name=None,
+        temperature=0.0,
+        timeout_seconds=30,
+        base_url=None,
+        api_key=None,
+        mock_mode=False,
+        mock_response='{"pages_to_create": [], "pages_to_update": [], "index_note": "", "log_note": ""}',
+    )
+    config = AppConfig(project_root=tmp_path, llm=llm_config)
+
+    env_fingerprint = compute_execution_fingerprint(config=config, system="rag")
+    cfg_fingerprint = compute_execution_fingerprint(
+        config=AppConfig(project_root=tmp_path, llm=LLMConfig(provider="openai-compatible", model_name="cfg-model")),
+        system="rag",
+    )
+
+    assert env_fingerprint != cfg_fingerprint
+
+
+def test_execution_fingerprint_prefers_config_model_over_env_model(monkeypatch, tmp_path):
+    monkeypatch.setenv("LLM_MODEL", "env-model")
+    config = AppConfig(project_root=tmp_path, llm=LLMConfig(provider="openai-compatible", model_name="cfg-model"))
+
+    fingerprint_with_env_set = compute_execution_fingerprint(config=config, system="rag")
+    fingerprint_without_env = compute_execution_fingerprint(
+        config=AppConfig(project_root=tmp_path, llm=LLMConfig(provider="openai-compatible", model_name="cfg-model")),
+        system="rag",
+    )
+
+    assert fingerprint_with_env_set == fingerprint_without_env
+
+
 def test_rag_query_fails_if_raw_corpus_drifted_since_index_build(monkeypatch, tmp_path):
     paths = ProjectPaths(project_root=tmp_path)
     paths.ensure()

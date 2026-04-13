@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from llm_wiki_vs_rag.cli.main import build_parser
 from llm_wiki_vs_rag.config import AppConfig, LLMConfig
@@ -245,6 +246,18 @@ def test_cli_run_queries_requires_explicit_phase_argument(tmp_path):
         assert exc.code == 2
     else:
         raise AssertionError("Expected run-rag-queries CLI parser to require --phase.")
+
+
+def test_readme_run_query_examples_include_required_phase_flag():
+    readme = Path("README.md").read_text(encoding="utf-8")
+    assert (
+        "python -m llm_wiki_vs_rag.cli.main run-rag-queries --query-file path/to/queries.jsonl --phase phase_1"
+        in readme
+    )
+    assert (
+        "python -m llm_wiki_vs_rag.cli.main run-wiki-queries --query-file path/to/queries.jsonl --phase phase_1"
+        in readme
+    )
 
 
 def test_compare_systems_fails_on_mismatched_query_cohorts(tmp_path):

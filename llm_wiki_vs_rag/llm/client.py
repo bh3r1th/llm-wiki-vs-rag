@@ -93,15 +93,11 @@ class LLMClient:
             self._adapter: _OpenAICompatibleAdapter | None = None
             return
 
-        provider = config.provider.lower()
+        provider, base_url, api_key, model_name = resolve_runtime_llm_settings(config)
         if provider in {"stub", "mock"}:
             raise ValueError("Stub/mock providers are disabled; use llm.mock_mode for deterministic tests.")
         if provider != "openai-compatible":
             raise ValueError(f"Unsupported LLM provider: {config.provider}")
-
-        base_url = config.base_url or os.getenv("LLM_BASE_URL")
-        api_key = config.api_key or os.getenv("LLM_API_KEY")
-        model_name = config.model_name or os.getenv("LLM_MODEL")
         if not base_url:
             raise ValueError("Missing LLM configuration: set llm.base_url or LLM_BASE_URL.")
         if not api_key:
@@ -147,3 +143,12 @@ class LLMClient:
         if not isinstance(parsed, dict):
             raise ValueError("Model output JSON must be an object.")
         return parsed
+
+
+def resolve_runtime_llm_settings(config: LLMConfig) -> tuple[str, str | None, str | None, str | None]:
+    """Resolve runtime provider settings using the same precedence path as the client."""
+    provider = config.provider.lower()
+    base_url = config.base_url or os.getenv("LLM_BASE_URL")
+    api_key = config.api_key or os.getenv("LLM_API_KEY")
+    model_name = config.model_name or os.getenv("LLM_MODEL")
+    return provider, base_url, api_key, model_name

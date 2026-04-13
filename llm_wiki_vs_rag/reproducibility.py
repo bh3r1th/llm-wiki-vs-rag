@@ -7,6 +7,7 @@ import json
 
 from llm_wiki_vs_rag.config import AppConfig
 from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
+from llm_wiki_vs_rag.llm.client import resolve_runtime_llm_settings
 from llm_wiki_vs_rag.paths import ProjectPaths
 
 
@@ -26,6 +27,7 @@ def compute_execution_fingerprint(config: AppConfig, system: str) -> str:
     """Compute benchmark-critical execution/config identity."""
     if system not in {"rag", "wiki"}:
         raise ValueError(f"Unsupported system for execution fingerprint: {system}")
+    provider, _, _, model_name = resolve_runtime_llm_settings(config.llm)
     payload = {
         "system": system,
         "chunking": {
@@ -35,7 +37,7 @@ def compute_execution_fingerprint(config: AppConfig, system: str) -> str:
         },
         "embedding_method_id": RAG_EMBEDDING_METHOD_ID if system == "rag" else "none",
         "retrieval_impl_id": RAG_RETRIEVAL_IMPL_ID if system == "rag" else WIKI_RETRIEVAL_IMPL_ID,
-        "model_id": f"{config.llm.provider}:{config.llm.model_name}",
+        "model_id": f"{provider}:{model_name}",
         "prompt_template_id": RAG_PROMPT_TEMPLATE_ID if system == "rag" else WIKI_PROMPT_TEMPLATE_ID,
     }
     return _hash_payload(payload)
