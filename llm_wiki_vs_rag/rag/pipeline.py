@@ -85,15 +85,6 @@ def answer_rag_query(config: AppConfig, paths: ProjectPaths, query: QueryCase) -
     )
 
 
-def batch_answer_rag_queries(
-    config: AppConfig,
-    paths: ProjectPaths,
-    query_cases: list[QueryCase],
-) -> list[GenerationResult]:
+def run_rag_queries(config: AppConfig, paths: ProjectPaths, query_cases: list[QueryCase]) -> list[GenerationResult]:
     """Run the RAG baseline for a query set."""
     return [answer_rag_query(config=config, paths=paths, query=query) for query in query_cases]
-
-
-def run_rag_queries(config: AppConfig, paths: ProjectPaths, query_cases: list[QueryCase]) -> list[GenerationResult]:
-    """Backward-compatible alias for query-set RAG execution."""
-    return batch_answer_rag_queries(config=config, paths=paths, query_cases=query_cases)
