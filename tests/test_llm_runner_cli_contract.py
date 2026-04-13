@@ -149,9 +149,29 @@ def test_benchmark_validation_accepts_env_only_provider_config(monkeypatch, tmp_
     captured: dict[str, object] = {}
     monkeypatch.setattr("llm_wiki_vs_rag.runner.save_run_outputs", lambda records, output_path: captured.update({"ok": True}))
 
-    run_command("run-rag-queries", config, query_file=str(query_file), phase="phase_1", snapshot_id="sha256:override")
+    run_command("run-rag-queries", config, query_file=str(query_file), phase="phase_1")
 
     assert captured["ok"] is True
+
+
+def test_cli_run_queries_rejects_snapshot_override_argument(tmp_path):
+    parser = build_parser()
+    try:
+        parser.parse_args(
+            [
+                "run-rag-queries",
+                "--query-file",
+                str(tmp_path / "queries.jsonl"),
+                "--phase",
+                "phase_1",
+                "--snapshot-id",
+                "sha256:forged",
+            ]
+        )
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("Expected run-rag-queries CLI parser to reject --snapshot-id.")
 
 
 def test_wiki_ingest_rejects_mock_provider_even_when_unlocked(tmp_path):

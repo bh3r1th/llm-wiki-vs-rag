@@ -168,7 +168,6 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         _validate_benchmark_llm_config(config)
         query_file = Path(str(kwargs["query_file"]))
         phase = str(kwargs["phase"])
-        snapshot_id = str(kwargs["snapshot_id"]) if kwargs.get("snapshot_id") is not None else None
         output_file = Path(str(kwargs.get("output_file") or paths.artifacts_dir / f"{command}.jsonl"))
         query_cases = load_query_cases(query_file)
         system = "rag" if command == "run-rag-queries" else "wiki"
@@ -179,7 +178,6 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
                 query_cases=query_cases,
                 system=system,
                 target_phase=phase,
-                snapshot_id=snapshot_id,
             ),
             output_file,
         )
