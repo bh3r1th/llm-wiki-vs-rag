@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 
 from llm_wiki_vs_rag.config import AppConfig
 from llm_wiki_vs_rag.data.load_docs import load_source_documents
@@ -62,19 +63,24 @@ def build_rag_index(config: AppConfig, paths: ProjectPaths):
 
 def answer_rag_query(config: AppConfig, paths: ProjectPaths, query: QueryCase) -> GenerationResult:
     """Answer a single query with the persisted RAG baseline."""
+    start = perf_counter()
     index = load_index(paths.artifacts_dir)
     llm_client = LLMClient(config=config.llm)
     chunks = retrieve_top_k(index=index, query=query.question, top_k=config.rag.top_k)
     prompt = build_rag_prompt(question=query.question, chunks=chunks)
     answer = llm_client.generate(prompt)
     run_id = _new_run_id(prefix=query.query_id)
-    _write_query_artifacts(paths=paths, run_id=run_id, query=query, prompt=prompt, answer=answer, retrieved_chunks=chunks)
+    run_dir = _write_query_artifacts(paths=paths, run_id=run_id, query=query, prompt=prompt, answer=answer, retrieved_chunks=chunks)
+    latency_ms = (perf_counter() - start) * 1000.0
 
     return GenerationResult(
         query_id=query.query_id,
         answer=answer,
         mode="rag",
         used_context_ids=[chunk.chunk_id for chunk in chunks],
+        run_id=run_id,
+        latency_ms=round(latency_ms, 3),
+        artifact_dir=str(run_dir),
     )
 
 

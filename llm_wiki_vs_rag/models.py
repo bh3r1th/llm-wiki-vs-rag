@@ -56,6 +56,9 @@ class GenerationResult(BaseModel):
     answer: str = Field(min_length=1)
     mode: str = Field(min_length=1)
     used_context_ids: list[str] = Field(default_factory=list)
+    run_id: str | None = None
+    latency_ms: float | None = Field(default=None, ge=0)
+    artifact_dir: str | None = None
 
 
 class EvalRecord(BaseModel):
