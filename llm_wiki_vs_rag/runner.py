@@ -121,6 +121,31 @@ def _validate_phase_snapshot_integrity(outputs, context: str) -> None:
             "Phase comparison requires distinct corpus snapshots for phase_1 and phase_2 in "
             f"{context}, but both phases map to snapshot={snapshot}."
         )
+    phase_order: dict[str, set[str]] = {"phase_1": set(), "phase_2": set()}
+    missing_order_rows: list[tuple[str, str]] = []
+    for record in phase_rows:
+        order_token = str(record.metadata.get("corpus_order", "")).strip()
+        if not order_token:
+            missing_order_rows.append((record.query_id, record.phase))
+            continue
+        phase_order[record.phase].add(order_token)
+    if missing_order_rows:
+        raise ValueError(
+            f"Missing corpus_order chronology token for phase comparison in {context}. "
+            f"missing_sample={missing_order_rows[:5]}."
+        )
+    if len(phase_order["phase_1"]) != 1 or len(phase_order["phase_2"]) != 1:
+        raise ValueError(
+            f"Inconsistent corpus_order chronology token mapping in {context}: "
+            f"phase_1={sorted(phase_order['phase_1'])}, phase_2={sorted(phase_order['phase_2'])}."
+        )
+    phase_1_order = next(iter(phase_order["phase_1"]))
+    phase_2_order = next(iter(phase_order["phase_2"]))
+    if phase_1_order >= phase_2_order:
+        raise ValueError(
+            "Phase comparison requires provable chronology ordering where phase_1 is earlier than phase_2 in "
+            f"{context}, but corpus_order phase_1={phase_1_order}, phase_2={phase_2_order}."
+        )
 
 
 def _validate_cross_system_phase_snapshot_parity(rag_outputs, wiki_outputs) -> None:

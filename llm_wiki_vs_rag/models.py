@@ -11,7 +11,7 @@ class SourceDocument(BaseModel):
 
     doc_id: str = Field(min_length=1)
     source_path: Path
-    text: str = Field(min_length=1)
+    text: str
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -19,6 +19,7 @@ class DocumentBatch(BaseModel):
     """Collection of source documents for a run."""
 
     documents: list[SourceDocument] = Field(default_factory=list)
+    chronology: list[dict[str, int | str]] = Field(default_factory=list)
 
 
 class QueryCase(BaseModel):

@@ -14,8 +14,8 @@ from llm_wiki_vs_rag.rag.pipeline import run_rag_queries
 from llm_wiki_vs_rag.wiki.pipeline import run_wiki_queries
 
 
-def resolve_corpus_snapshot_identity(paths: ProjectPaths, system: str) -> str:
-    """Resolve a concrete corpus snapshot identifier for benchmark run outputs."""
+def _resolve_corpus_snapshot_manifest(paths: ProjectPaths, system: str) -> dict:
+    """Load the canonical snapshot manifest for one system."""
     if system == "rag":
         manifest_path = paths.artifacts_dir / "rag_index" / "manifest.json"
     elif system == "wiki":
@@ -29,9 +29,15 @@ def resolve_corpus_snapshot_identity(paths: ProjectPaths, system: str) -> str:
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"Invalid snapshot manifest payload for {system}: {manifest_path}")
+    return payload
+
+
+def resolve_corpus_snapshot_identity(paths: ProjectPaths, system: str) -> str:
+    """Resolve a concrete corpus snapshot identifier for benchmark run outputs."""
+    payload = _resolve_corpus_snapshot_manifest(paths=paths, system=system)
     snapshot_id = str(payload.get("snapshot_id", "")).strip()
     if not snapshot_id:
-        raise ValueError(f"Missing snapshot_id in canonical snapshot manifest for {system}: {manifest_path}")
+        raise ValueError(f"Missing snapshot_id in canonical snapshot manifest for {system}.")
     return snapshot_id
 
 
@@ -167,7 +173,11 @@ def run_queries_for_system(
             "Each query case must have a unique (query_id, phase) identity per run. "
             f"duplicate_identity_sample={duplicate_identities[:5]}"
         )
-    snapshot_identity = resolve_corpus_snapshot_identity(paths=paths, system=system)
+    manifest_payload = _resolve_corpus_snapshot_manifest(paths=paths, system=system)
+    snapshot_identity = str(manifest_payload.get("snapshot_id", "")).strip()
+    if not snapshot_identity:
+        raise ValueError(f"Missing snapshot_id in canonical snapshot manifest for {system}.")
+    corpus_order = str(manifest_payload.get("corpus_order", "")).strip() or None
 
     if system == "rag":
         results = run_rag_queries(
@@ -260,6 +270,7 @@ def run_queries_for_system(
                     "used_context_ids": result.used_context_ids,
                     "artifact_dir": result.artifact_dir,
                     "corpus_snapshot": snapshot_identity,
+                    "corpus_order": corpus_order,
                 },
             )
         )

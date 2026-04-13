@@ -9,7 +9,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from llm_wiki_vs_rag.config import AppConfig
-from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
+from llm_wiki_vs_rag.data.load_docs import corpus_order_token, fingerprint_document_batch, load_source_documents
 from llm_wiki_vs_rag.llm.client import LLMClient
 from llm_wiki_vs_rag.models import GenerationResult, QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
@@ -39,9 +39,12 @@ def _resolve_wiki_snapshot_identity(paths: ProjectPaths) -> str:
     return snapshot_id
 
 
-def _write_wiki_snapshot_manifest(wiki_dir: Path, snapshot_id: str) -> None:
+def _write_wiki_snapshot_manifest(wiki_dir: Path, snapshot_id: str, corpus_order: str | None = None) -> None:
     manifest_path = wiki_dir / "snapshot.json"
-    manifest_path.write_text(json.dumps({"snapshot_id": snapshot_id}, indent=2), encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps({"snapshot_id": snapshot_id, "corpus_order": corpus_order}, indent=2),
+        encoding="utf-8",
+    )
 
 
 def ingest_wiki(config: AppConfig, paths: ProjectPaths):
@@ -61,7 +64,7 @@ def ingest_wiki(config: AppConfig, paths: ProjectPaths):
                 corpus_snapshot=snapshot_id,
             )
         )
-    _write_wiki_snapshot_manifest(paths.wiki_dir, snapshot_id)
+    _write_wiki_snapshot_manifest(paths.wiki_dir, snapshot_id, corpus_order=corpus_order_token(batch))
     return summaries
 
 

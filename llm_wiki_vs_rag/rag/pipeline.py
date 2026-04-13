@@ -9,7 +9,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from llm_wiki_vs_rag.config import AppConfig
-from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
+from llm_wiki_vs_rag.data.load_docs import corpus_order_token, fingerprint_document_batch, load_source_documents
 from llm_wiki_vs_rag.llm.client import LLMClient
 from llm_wiki_vs_rag.models import GenerationResult, QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
@@ -81,7 +81,12 @@ def build_rag_index(config: AppConfig, paths: ProjectPaths):
         chunk_size_chars=config.rag.chunk_size,
         chunk_overlap_chars=config.rag.chunk_overlap,
     )
-    persist_index(index=index, artifacts_dir=paths.artifacts_dir, snapshot_id=snapshot_id)
+    persist_index(
+        index=index,
+        artifacts_dir=paths.artifacts_dir,
+        snapshot_id=snapshot_id,
+        corpus_order=corpus_order_token(batch),
+    )
     return index
 
 
@@ -92,9 +97,28 @@ def answer_rag_query(
     corpus_snapshot: str | None = None,
 ) -> GenerationResult:
     """Answer a single query with the persisted RAG baseline."""
-    start = perf_counter()
     index = load_index(paths.artifacts_dir)
     llm_client = LLMClient(config=config.llm)
+    return _answer_rag_query_with_resources(
+        config=config,
+        paths=paths,
+        query=query,
+        index=index,
+        llm_client=llm_client,
+        corpus_snapshot=corpus_snapshot,
+    )
+
+
+def _answer_rag_query_with_resources(
+    config: AppConfig,
+    paths: ProjectPaths,
+    query: QueryCase,
+    index,
+    llm_client: LLMClient,
+    corpus_snapshot: str | None = None,
+) -> GenerationResult:
+    """Answer one query using preloaded RAG resources."""
+    start = perf_counter()
     requested_top_k = config.retrieval_top_k()
     chunks = retrieve_top_k(index=index, query=query.question, top_k=requested_top_k)
     prompt = build_rag_prompt(question=query.question, chunks=chunks)
@@ -137,7 +161,16 @@ def run_rag_queries(
     corpus_snapshot: str | None = None,
 ) -> list[GenerationResult]:
     """Run the RAG baseline for a query set."""
+    index = load_index(paths.artifacts_dir)
+    llm_client = LLMClient(config=config.llm)
     return [
-        answer_rag_query(config=config, paths=paths, query=query, corpus_snapshot=corpus_snapshot)
+        _answer_rag_query_with_resources(
+            config=config,
+            paths=paths,
+            query=query,
+            index=index,
+            llm_client=llm_client,
+            corpus_snapshot=corpus_snapshot,
+        )
         for query in query_cases
     ]

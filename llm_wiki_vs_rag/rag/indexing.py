@@ -78,7 +78,7 @@ def build_in_memory_index(
     return RAGIndex(chunks=chunks, embeddings=embeddings, backend="numpy")
 
 
-def persist_index(index: RAGIndex, artifacts_dir: Path, snapshot_id: str) -> Path:
+def persist_index(index: RAGIndex, artifacts_dir: Path, snapshot_id: str, corpus_order: str | None = None) -> Path:
     """Persist vector matrix and chunk metadata under artifacts/rag_index."""
     index_dir = artifacts_dir / INDEX_DIRNAME
     index_dir.mkdir(parents=True, exist_ok=True)
@@ -96,6 +96,7 @@ def persist_index(index: RAGIndex, artifacts_dir: Path, snapshot_id: str) -> Pat
         "embedding_dim": int(normalized_embeddings.shape[1]) if normalized_embeddings.ndim == 2 else EMBED_DIM,
         "num_chunks": len(index.chunks),
         "snapshot_id": snapshot_id,
+        "corpus_order": corpus_order,
     }
     (index_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return index_dir
