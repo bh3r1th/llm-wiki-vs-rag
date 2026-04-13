@@ -67,7 +67,12 @@ def build_wiki_query_prompt(question: str, pages: list[PageRecord]) -> str:
     """Build generation prompt using retrieved wiki pages."""
     context = "\n\n".join(f"[{page.title}]\n{page.content}" for page in pages)
     return (
-        "Use the wiki pages below to answer the question. Cite concrete facts from these pages only.\n\n"
-        f"Question: {question}\n\n"
-        f"Wiki context:\n{context if context else '(No wiki pages retrieved.)'}"
+        "You are answering a question strictly from provided wiki context.\n"
+        "Rules:\n"
+        "1) Answer only from the wiki context below.\n"
+        "2) If context is insufficient, reply exactly: INSUFFICIENT_EVIDENCE.\n"
+        "3) Do not invent latest-state, current-status, or time-sensitive claims unless directly supported by context.\n\n"
+        f"Question:\n{question}\n\n"
+        f"Wiki context:\n{context if context else '[no context provided]'}\n\n"
+        "Answer:"
     )

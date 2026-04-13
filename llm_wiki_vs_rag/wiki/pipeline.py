@@ -36,18 +36,21 @@ def run_wiki_queries(
     config: AppConfig,
     paths: ProjectPaths,
     query_cases: list[QueryCase],
-    use_rag_fallback: bool = False,
+    use_rag_fallback: bool | None = None,
 ) -> list[GenerationResult]:
     """Run query-time answer generation from wiki pages with optional RAG fallback."""
     pages = load_pages(paths.wiki_dir)
     llm_client = LLMClient(config=config.llm)
 
+    fallback_enabled = config.wiki_fallback_enabled(use_rag_fallback)
+    top_k = config.retrieval_top_k()
+
     results: list[GenerationResult] = []
     for query in query_cases:
         start = perf_counter()
-        selected_pages = retrieve_wiki_pages(pages=pages, query=query.question, top_k=3)
+        selected_pages = retrieve_wiki_pages(pages=pages, query=query.question, top_k=top_k)
 
-        if use_rag_fallback and not selected_pages:
+        if fallback_enabled and not selected_pages:
             results.append(answer_rag_query(config=config, paths=paths, query=query))
             continue
 
@@ -70,7 +73,7 @@ def run_wiki_queries(
                     "run_id": run_id,
                     "mode": "wiki",
                     "used_context_ids": [page.slug for page in selected_pages],
-                    "fallback_to_rag": use_rag_fallback,
+                    "fallback_to_rag": fallback_enabled,
                 },
                 indent=2,
             ),

@@ -27,6 +27,14 @@ class WikiConfig(BaseModel):
 
     page_token_budget: int = Field(default=1200, ge=1)
     max_links_per_page: int = Field(default=5, ge=0)
+    query_top_k: int = Field(default=5, ge=1)
+    allow_rag_fallback: bool = False
+
+
+class BenchmarkConfig(BaseModel):
+    """Configuration for locked benchmark contract behavior."""
+
+    locked: bool = True
 
 
 class EvalConfig(BaseModel):
@@ -42,5 +50,22 @@ class AppConfig(BaseModel):
     project_root: Path = Field(default_factory=lambda: Path.cwd())
     rag: RAGConfig = Field(default_factory=RAGConfig)
     wiki: WikiConfig = Field(default_factory=WikiConfig)
+    benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
     eval: EvalConfig = Field(default_factory=EvalConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
+
+    def retrieval_top_k(self) -> int:
+        """Shared retrieval budget policy for query-time benchmark comparisons."""
+        if self.benchmark.locked and self.rag.top_k != self.wiki.query_top_k:
+            raise ValueError(
+                "Locked benchmark mode requires retrieval parity: "
+                f"rag.top_k={self.rag.top_k} must equal wiki.query_top_k={self.wiki.query_top_k}."
+            )
+        return self.rag.top_k
+
+    def wiki_fallback_enabled(self, requested_fallback: bool | None = None) -> bool:
+        """Resolve wiki fallback behavior with strict benchmark purity guardrails."""
+        enabled = self.wiki.allow_rag_fallback if requested_fallback is None else requested_fallback
+        if self.benchmark.locked and enabled:
+            raise ValueError("Locked benchmark mode forbids wiki->RAG fallback.")
+        return enabled
