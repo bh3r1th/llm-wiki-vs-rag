@@ -66,7 +66,7 @@ def answer_rag_query(config: AppConfig, paths: ProjectPaths, query: QueryCase) -
     start = perf_counter()
     index = load_index(paths.artifacts_dir)
     llm_client = LLMClient(config=config.llm)
-    chunks = retrieve_top_k(index=index, query=query.question, top_k=config.rag.top_k)
+    chunks = retrieve_top_k(index=index, query=query.question, top_k=config.retrieval_top_k())
     prompt = build_rag_prompt(question=query.question, chunks=chunks)
     answer = llm_client.generate(prompt)
     run_id = _new_run_id(prefix=query.query_id)
