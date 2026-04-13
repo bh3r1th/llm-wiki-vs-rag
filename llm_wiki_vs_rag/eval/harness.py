@@ -686,3 +686,108 @@ def write_manual_label_template_from_run_outputs(
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def write_review_pack_from_run_outputs(
+    run_outputs: list[RunOutputRecord],
+    output_dir: Path,
+) -> None:
+    """Write compact CSV and markdown review artifacts from validated run outputs."""
+    fieldnames = [
+        "system",
+        "query_id",
+        "phase",
+        "category",
+        "question",
+        "answer",
+        "artifact_path",
+        "corpus_snapshot",
+        "execution_fingerprint",
+    ]
+    rows: list[dict[str, str]] = []
+    seen_identities: set[tuple[str, str, str]] = set()
+    duplicate_identities: list[tuple[str, str, str]] = []
+    for record in run_outputs:
+        identity = (record.system, record.query_id, record.phase)
+        if identity in seen_identities:
+            duplicate_identities.append(identity)
+            continue
+        seen_identities.add(identity)
+        question = record.question.strip()
+        answer = record.answer.strip()
+        corpus_snapshot = str(record.metadata.get("corpus_snapshot", "")).strip()
+        execution_fingerprint = str(record.metadata.get("execution_fingerprint", "")).strip()
+        artifact_path = str(record.metadata.get("artifact_path", "")).strip() or str(
+            record.metadata.get("artifact_dir", "")
+        ).strip()
+        if not question or not answer:
+            raise ValueError(
+                "Review pack generation requires non-empty question and answer for every row. "
+                f"system={record.system}, query_id={record.query_id}, phase={record.phase}."
+            )
+        if not corpus_snapshot or not execution_fingerprint:
+            raise ValueError(
+                "Review pack generation requires metadata.corpus_snapshot and "
+                "metadata.execution_fingerprint for every row. "
+                f"system={record.system}, query_id={record.query_id}, phase={record.phase}."
+            )
+        rows.append(
+            {
+                "system": record.system,
+                "query_id": record.query_id,
+                "phase": record.phase,
+                "category": record.category,
+                "question": question,
+                "answer": answer,
+                "artifact_path": artifact_path,
+                "corpus_snapshot": corpus_snapshot,
+                "execution_fingerprint": execution_fingerprint,
+            }
+        )
+    if duplicate_identities:
+        sample = [
+            {"system": system, "query_id": query_id, "phase": phase}
+            for system, query_id, phase in duplicate_identities[:5]
+        ]
+        raise ValueError(
+            "Review pack generation requires unique run output rows per (system, query_id, phase). "
+            f"duplicate_sample={sample}."
+        )
+
+    sorted_rows = sorted(
+        rows,
+        key=lambda row: (
+            row["phase"],
+            row["category"],
+            row["system"],
+            row["query_id"],
+        ),
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    csv_path = output_dir / "review_pack.csv"
+    with csv_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(sorted_rows)
+
+    markdown_path = output_dir / "review_pack.md"
+    with markdown_path.open("w", encoding="utf-8") as handle:
+        handle.write("# Review Pack\n\n")
+        current_phase = None
+        current_category = None
+        for row in sorted_rows:
+            if row["phase"] != current_phase:
+                current_phase = row["phase"]
+                current_category = None
+                handle.write(f"## {current_phase}\n\n")
+            if row["category"] != current_category:
+                current_category = row["category"]
+                handle.write(f"### {current_category}\n\n")
+            handle.write(f"- system: {row['system']}\n")
+            handle.write(f"  query_id: {row['query_id']}\n")
+            handle.write(f"  question: {row['question']}\n")
+            handle.write(f"  answer: {row['answer']}\n")
+            handle.write(f"  artifact_path: {row['artifact_path']}\n")
+            handle.write(f"  corpus_snapshot: {row['corpus_snapshot']}\n")
+            handle.write(f"  execution_fingerprint: {row['execution_fingerprint']}\n\n")

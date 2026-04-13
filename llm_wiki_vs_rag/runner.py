@@ -22,6 +22,7 @@ from llm_wiki_vs_rag.eval.harness import (
     save_query_cases,
     save_run_outputs,
     write_manual_label_template_from_run_outputs,
+    write_review_pack_from_run_outputs,
 )
 from llm_wiki_vs_rag.eval.report import write_reports
 from llm_wiki_vs_rag.data.corpus_freeze import write_corpus_manifest
@@ -506,5 +507,10 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     elif command == "inspect-run":
         run_file = Path(str(kwargs["run_file"]))
         _inspect_run_outputs(run_file)
+    elif command == "make-review-pack":
+        run_file = Path(str(kwargs["run_file"]))
+        output_dir = Path(str(kwargs["output_dir"]))
+        run_outputs = load_run_outputs(run_file)
+        write_review_pack_from_run_outputs(run_outputs=run_outputs, output_dir=output_dir)
     else:
         raise ValueError(f"Unsupported command: {command}")
