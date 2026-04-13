@@ -124,6 +124,13 @@ def _answer_rag_query_with_resources(
 ) -> GenerationResult:
     """Answer one query using preloaded RAG resources."""
     snapshot_id, execution_fingerprint = _resolve_rag_manifest(paths)
+    runtime_execution_fingerprint = compute_execution_fingerprint(config=config, system="rag")
+    if runtime_execution_fingerprint != execution_fingerprint:
+        raise ValueError(
+            "Execution fingerprint mismatch at query runtime; query execution refused. "
+            f"system=rag, manifest_fingerprint={execution_fingerprint}, "
+            f"runtime_fingerprint={runtime_execution_fingerprint}."
+        )
     validate_current_raw_corpus_snapshot(paths=paths, expected_snapshot=snapshot_id, system="rag")
     start = perf_counter()
     requested_top_k = config.retrieval_top_k()
