@@ -30,6 +30,9 @@ def _write_query_artifacts(
     prompt: str,
     answer: str,
     retrieved_chunks: list,
+    prompt_tokens: int,
+    completion_tokens: int,
+    total_tokens: int,
 ) -> Path:
     run_dir = paths.artifacts_dir / "rag_runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -45,6 +48,11 @@ def _write_query_artifacts(
         "query_id": query.query_id,
         "question": query.question,
         "top_k": len(retrieved_chunks),
+        "token_usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+        },
     }
     (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     return run_dir
@@ -69,9 +77,20 @@ def answer_rag_query(config: AppConfig, paths: ProjectPaths, query: QueryCase) -
     llm_client = LLMClient(config=config.llm)
     chunks = retrieve_top_k(index=index, query=query.question, top_k=config.retrieval_top_k())
     prompt = build_rag_prompt(question=query.question, chunks=chunks)
-    answer = llm_client.generate(prompt)
+    llm_response = llm_client.generate_response(prompt, require_token_usage=True)
+    answer = llm_response.text
     run_id = _new_run_id(prefix=query.query_id)
-    run_dir = _write_query_artifacts(paths=paths, run_id=run_id, query=query, prompt=prompt, answer=answer, retrieved_chunks=chunks)
+    run_dir = _write_query_artifacts(
+        paths=paths,
+        run_id=run_id,
+        query=query,
+        prompt=prompt,
+        answer=answer,
+        retrieved_chunks=chunks,
+        prompt_tokens=llm_response.token_usage.prompt_tokens,
+        completion_tokens=llm_response.token_usage.completion_tokens,
+        total_tokens=llm_response.token_usage.total_tokens,
+    )
     latency_ms = (perf_counter() - start) * 1000.0
 
     return GenerationResult(
@@ -82,6 +101,9 @@ def answer_rag_query(config: AppConfig, paths: ProjectPaths, query: QueryCase) -
         run_id=run_id,
         latency_ms=round(latency_ms, 3),
         artifact_dir=str(run_dir),
+        prompt_tokens=llm_response.token_usage.prompt_tokens,
+        completion_tokens=llm_response.token_usage.completion_tokens,
+        total_tokens=llm_response.token_usage.total_tokens,
     )
 
 

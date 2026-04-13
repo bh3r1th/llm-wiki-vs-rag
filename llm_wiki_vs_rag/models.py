@@ -50,3 +50,6 @@ class GenerationResult(BaseModel):
     run_id: str | None = None
     latency_ms: float | None = Field(default=None, ge=0)
     artifact_dir: str | None = None
+    prompt_tokens: int | None = Field(default=None, ge=0)
+    completion_tokens: int | None = Field(default=None, ge=0)
+    total_tokens: int | None = Field(default=None, ge=0)
