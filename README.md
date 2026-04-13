@@ -84,6 +84,86 @@ python -m llm_wiki_vs_rag.cli.main compare-systems \
   --output-dir artifacts/compare-systems
 ```
 
+## Smoke run workflow
+
+```bash
+# 1) freeze-corpus
+python -m llm_wiki_vs_rag.cli.main freeze-corpus --dataset-root path/to/dataset
+
+# 2) validate-queries
+python -m llm_wiki_vs_rag.cli.main validate-queries --query-file path/to/benchmark_queries.jsonl
+
+# 3) smoke-queries
+python -m llm_wiki_vs_rag.cli.main smoke-queries --query-file path/to/benchmark_queries.jsonl --output-file artifacts/smoke_queries.jsonl
+
+# 4) split by phase
+# Split benchmark_queries.jsonl into two files:
+#   - artifacts/queries.phase_1.jsonl (phase_1 rows only)
+#   - artifacts/queries.phase_2.jsonl (phase_2 rows only)
+
+# 5) switch raw to phase_1
+python -m llm_wiki_vs_rag.cli.main switch-phase-corpus --phase phase_1
+
+# 6) build-rag-index
+python -m llm_wiki_vs_rag.cli.main build-rag-index
+
+# 7) wiki-ingest
+python -m llm_wiki_vs_rag.cli.main wiki-ingest
+
+# 8) benchmark-phase-run for rag/wiki phase_1
+python -m llm_wiki_vs_rag.cli.main benchmark-phase-run --system rag --phase phase_1 --query-file artifacts/queries.phase_1.jsonl --output-file artifacts/rag.phase_1.jsonl
+python -m llm_wiki_vs_rag.cli.main benchmark-phase-run --system wiki --phase phase_1 --query-file artifacts/queries.phase_1.jsonl --output-file artifacts/wiki.phase_1.jsonl
+
+# 9) switch raw to phase_2
+python -m llm_wiki_vs_rag.cli.main switch-phase-corpus --phase phase_2
+
+# 10) build-rag-index
+python -m llm_wiki_vs_rag.cli.main build-rag-index
+
+# 11) wiki-ingest
+python -m llm_wiki_vs_rag.cli.main wiki-ingest
+
+# 12) benchmark-phase-run for rag/wiki phase_2
+python -m llm_wiki_vs_rag.cli.main benchmark-phase-run --system rag --phase phase_2 --query-file artifacts/queries.phase_2.jsonl --output-file artifacts/rag.phase_2.jsonl
+python -m llm_wiki_vs_rag.cli.main benchmark-phase-run --system wiki --phase phase_2 --query-file artifacts/queries.phase_2.jsonl --output-file artifacts/wiki.phase_2.jsonl
+
+# 13) merge per-phase run files
+cat artifacts/rag.phase_1.jsonl artifacts/rag.phase_2.jsonl > artifacts/rag.run.jsonl
+cat artifacts/wiki.phase_1.jsonl artifacts/wiki.phase_2.jsonl > artifacts/wiki.run.jsonl
+
+# 14) inspect-run
+python -m llm_wiki_vs_rag.cli.main inspect-run --run-file artifacts/rag.run.jsonl
+python -m llm_wiki_vs_rag.cli.main inspect-run --run-file artifacts/wiki.run.jsonl
+
+# 15) make-label-template
+python -m llm_wiki_vs_rag.cli.main make-label-template --run-file artifacts/rag.run.jsonl --output-file artifacts/manual_labels.csv
+
+# 16) evaluate
+python -m llm_wiki_vs_rag.cli.main evaluate-rag --run-file artifacts/rag.run.jsonl --labels-file artifacts/manual_labels.csv --output-dir artifacts/eval-rag
+python -m llm_wiki_vs_rag.cli.main evaluate-wiki --run-file artifacts/wiki.run.jsonl --labels-file artifacts/manual_labels.csv --output-dir artifacts/eval-wiki
+
+# 17) compare-systems
+python -m llm_wiki_vs_rag.cli.main compare-systems --rag-run-file artifacts/rag.run.jsonl --wiki-run-file artifacts/wiki.run.jsonl --labels-file artifacts/manual_labels.csv --output-dir artifacts/compare-systems
+```
+
+## Manual labeling guide
+
+Allowed values:
+
+- `accuracy`: `correct` | `partial` | `wrong`
+- `synthesis`: `full` | `incomplete` | `failed`
+- `latest_state`: `correct` | `stale` | `missed_update`
+- `contradiction_detected`: `true` | `false`
+- `contradiction_resolved`: `true` | `false`
+- `compression_loss`: `none` | `minor` | `major`
+- `provenance_fidelity`: `true` | `false`
+
+## Important note
+
+- Evaluation requires manual labels.
+- Complete the smoke run before running a full benchmark.
+- `phase_1` and `phase_2` must run against different raw snapshots.
+
 ## Important constraints
 
 - No GraphRAG extensions
