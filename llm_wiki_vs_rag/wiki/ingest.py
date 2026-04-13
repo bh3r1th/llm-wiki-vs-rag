@@ -29,11 +29,11 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def ingest_one_document(paths: ProjectPaths, llm_client: LLMClient, document: SourceDocument, top_k: int = 5) -> dict:
+def ingest_one_document(paths: ProjectPaths, llm_client: LLMClient, document: SourceDocument) -> dict:
     """Ingest one raw document against existing wiki state."""
     timestamp = _utc_timestamp()
     current_pages = load_pages(paths.wiki_dir)
-    selected_pages = retrieve_wiki_pages(pages=current_pages, query=document.text, top_k=top_k)
+    selected_pages = retrieve_wiki_pages(pages=current_pages, query=document.text, top_k=5)
 
     prompt = build_ingest_prompt(document=document, selected_pages=selected_pages)
     llm_raw = llm_client.generate_json(prompt)

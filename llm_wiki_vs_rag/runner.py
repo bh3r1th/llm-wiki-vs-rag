@@ -29,8 +29,6 @@ def _validate_benchmark_llm_config(config: AppConfig) -> None:
         raise ValueError("Missing LLM configuration for benchmark commands: llm.base_url is required.")
     if not config.llm.api_key:
         raise ValueError("Missing LLM configuration for benchmark commands: llm.api_key is required.")
-    if not config.llm.model_name:
-        raise ValueError("Missing LLM configuration for benchmark commands: llm.model_name is required.")
 
 
 def _validate_comparison_cohorts(rag_outputs, wiki_outputs) -> None:
@@ -121,6 +119,29 @@ def _validate_phase_snapshot_integrity(outputs, context: str) -> None:
         )
 
 
+def _validate_cross_system_phase_snapshot_parity(rag_outputs, wiki_outputs) -> None:
+    for phase in ("phase_1", "phase_2"):
+        rag_snapshots = {
+            str(record.metadata.get("corpus_snapshot", "")).strip()
+            for record in rag_outputs
+            if record.phase == phase
+        }
+        wiki_snapshots = {
+            str(record.metadata.get("corpus_snapshot", "")).strip()
+            for record in wiki_outputs
+            if record.phase == phase
+        }
+        rag_snapshots.discard("")
+        wiki_snapshots.discard("")
+        if not rag_snapshots and not wiki_snapshots:
+            continue
+        if rag_snapshots != wiki_snapshots:
+            raise ValueError(
+                f"Cross-system snapshot parity failed for {phase}: "
+                f"rag_snapshots={sorted(rag_snapshots)}, wiki_snapshots={sorted(wiki_snapshots)}."
+            )
+
+
 def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     """Dispatch supported runner commands to pipeline entry points."""
     paths = ProjectPaths(config.project_root)
@@ -159,6 +180,7 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         _validate_phase_snapshot_integrity(wiki_outputs, context=f"compare-systems wiki:{wiki_run_file}")
         _validate_system_uniqueness(rag_outputs, "rag")
         _validate_system_uniqueness(wiki_outputs, "wiki")
+        _validate_cross_system_phase_snapshot_parity(rag_outputs, wiki_outputs)
         _validate_comparison_cohorts(rag_outputs, wiki_outputs)
         _validate_comparison_queryset_equivalence(rag_outputs, wiki_outputs)
         outputs = rag_outputs + wiki_outputs
