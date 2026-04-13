@@ -276,6 +276,9 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
             ),
             output_file,
         )
+    elif command == "validate-queries":
+        query_file = Path(str(kwargs["query_file"]))
+        load_query_cases(query_file)
     elif command in {"evaluate-rag", "evaluate-wiki"}:
         run_file = Path(str(kwargs["run_file"]))
         labels_file = Path(str(kwargs["labels_file"]))

@@ -85,7 +85,12 @@ def test_benchmark_commands_reject_mock_mode(tmp_path):
     config = AppConfig(project_root=tmp_path, llm=LLMConfig(provider="openai-compatible", mock_mode=True))
     query_file = tmp_path / "queries.jsonl"
     query_file.write_text(
-        json.dumps({"query_id": "q1", "question": "Q?", "category": "policy", "phase": "phase_1"}) + "\n",
+        (
+            json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_1"})
+            + "\n"
+            + json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_2"})
+            + "\n"
+        ),
         encoding="utf-8",
     )
 
@@ -104,7 +109,12 @@ def test_benchmark_commands_validate_single_mock_control_mechanism(tmp_path):
     )
     query_file = tmp_path / "queries.jsonl"
     query_file.write_text(
-        json.dumps({"query_id": "q1", "question": "Q?", "category": "policy", "phase": "phase_1"}) + "\n",
+        (
+            json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_1"})
+            + "\n"
+            + json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_2"})
+            + "\n"
+        ),
         encoding="utf-8",
     )
 
@@ -123,7 +133,12 @@ def test_benchmark_commands_require_provider_config(tmp_path):
     )
     query_file = tmp_path / "queries.jsonl"
     query_file.write_text(
-        json.dumps({"query_id": "q1", "question": "Q?", "category": "policy", "phase": "phase_1"}) + "\n",
+        (
+            json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_1"})
+            + "\n"
+            + json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_2"})
+            + "\n"
+        ),
         encoding="utf-8",
     )
 
@@ -144,7 +159,12 @@ def test_benchmark_validation_accepts_env_only_provider_config(monkeypatch, tmp_
     )
     query_file = tmp_path / "queries.jsonl"
     query_file.write_text(
-        json.dumps({"query_id": "q1", "question": "Q?", "category": "policy", "phase": "phase_1"}) + "\n",
+        (
+            json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_1"})
+            + "\n"
+            + json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_2"})
+            + "\n"
+        ),
         encoding="utf-8",
     )
     monkeypatch.setattr("llm_wiki_vs_rag.runner.run_queries_for_system", lambda **kwargs: [])
@@ -216,7 +236,12 @@ def test_cli_output_args_are_optional_and_runner_defaults_are_used(monkeypatch, 
 
     query_file = tmp_path / "queries.jsonl"
     query_file.write_text(
-        json.dumps({"query_id": "q1", "question": "Q?", "category": "policy", "phase": "phase_1"}) + "\n",
+        (
+            json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_1"})
+            + "\n"
+            + json.dumps({"query_id": "q1", "question": "Q?", "category": "lookup", "phase": "phase_2"})
+            + "\n"
+        ),
         encoding="utf-8",
     )
 
