@@ -2,15 +2,15 @@
 
 ## Remaining critical benchmark credibility issues
 
-1. **`evaluate-*` and `compare-systems` still do not enforce execution-fingerprint cohort integrity.**
-   They validate `corpus_snapshot` and `corpus_order` consistency, but they do not require a single `execution_fingerprint` per `(system, phase)` cohort and do not require the field to exist on loaded run rows. A mixed run file can therefore still blend outputs from different benchmark configurations into one reported score if snapshot/order happen to match.
+1. **None found.**
+   The previously reported execution-fingerprint cohort integrity gap appears closed: loaded run rows now require `metadata.execution_fingerprint`, and evaluation/compare paths enforce one fingerprint per `(system, phase)` cohort.
 
 ## Remaining contract deviations
 
-1. **Report/evaluation contract still allows missing execution fingerprint in externally supplied run files.**
-   Runtime query execution writes and validates `execution_fingerprint`, but `evaluate-rag`, `evaluate-wiki`, and `compare-systems` do not reject run rows where `metadata.execution_fingerprint` is absent or empty.
+1. **None found against the repo’s current benchmark/eval contract.**
+   Current command contracts and validation flow are consistent with the enforced checks in runner/harness (phase targeting, system purity, snapshot/order integrity, and execution-fingerprint integrity).
 
 ## Dead code still worth removing before experiment
 
-1. **No high-risk dead code remains in the core benchmark/eval path.**
-   No obviously orphaned logic in `runner.py`, query pipelines, or eval harness appears to threaten experiment integrity; cleanup can be deferred.
+1. **None clearly worth removing before experiment execution.**
+   I did not find orphaned paths in the benchmark-critical runner/harness/query execution flow that materially affect experiment validity.
