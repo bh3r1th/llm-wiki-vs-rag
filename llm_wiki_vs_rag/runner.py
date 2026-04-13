@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from llm_wiki_vs_rag.config import AppConfig
@@ -25,10 +26,10 @@ def _validate_benchmark_llm_config(config: AppConfig) -> None:
         raise ValueError("Benchmark commands cannot run with llm mock_mode enabled.")
     if provider != "openai-compatible":
         raise ValueError(f"Unsupported benchmark LLM provider: {config.llm.provider}.")
-    if not config.llm.base_url:
-        raise ValueError("Missing LLM configuration for benchmark commands: llm.base_url is required.")
-    if not config.llm.api_key:
-        raise ValueError("Missing LLM configuration for benchmark commands: llm.api_key is required.")
+    if not (config.llm.base_url or os.getenv("LLM_BASE_URL")):
+        raise ValueError("Missing LLM configuration for benchmark commands: set llm.base_url or LLM_BASE_URL.")
+    if not (config.llm.api_key or os.getenv("LLM_API_KEY")):
+        raise ValueError("Missing LLM configuration for benchmark commands: set llm.api_key or LLM_API_KEY.")
 
 
 def _validate_comparison_cohorts(rag_outputs, wiki_outputs) -> None:
@@ -161,8 +162,7 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     if command == "build-rag-index":
         build_rag_index(config=config, paths=paths)
     elif command == "wiki-ingest":
-        if config.benchmark.locked:
-            _validate_benchmark_llm_config(config)
+        _validate_benchmark_llm_config(config)
         ingest_wiki(config=config, paths=paths)
     elif command in {"run-rag-queries", "run-wiki-queries"}:
         _validate_benchmark_llm_config(config)

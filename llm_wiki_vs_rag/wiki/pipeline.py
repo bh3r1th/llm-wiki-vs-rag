@@ -24,6 +24,12 @@ def _new_run_id(query_id: str) -> str:
     return f"{query_id}-{timestamp}-{uuid4().hex[:8]}"
 
 
+def _new_ingest_run_id(snapshot_id: str) -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    snapshot_slug = snapshot_id.replace(":", "_")
+    return f"{snapshot_slug}-{timestamp}-{uuid4().hex[:8]}"
+
+
 def _resolve_wiki_snapshot_identity(paths: ProjectPaths) -> str:
     manifest_path = paths.wiki_dir / "snapshot.json"
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -42,10 +48,19 @@ def ingest_wiki(config: AppConfig, paths: ProjectPaths):
     """Process raw docs sequentially and update markdown wiki incrementally."""
     batch = load_source_documents(paths.raw_dir)
     snapshot_id = fingerprint_document_batch(batch)
+    ingest_run_id = _new_ingest_run_id(snapshot_id)
     llm_client = LLMClient(config=config.llm)
     summaries = []
     for document in batch.documents:
-        summaries.append(ingest_one_document(paths=paths, llm_client=llm_client, document=document))
+        summaries.append(
+            ingest_one_document(
+                paths=paths,
+                llm_client=llm_client,
+                document=document,
+                ingest_run_id=ingest_run_id,
+                corpus_snapshot=snapshot_id,
+            )
+        )
     _write_wiki_snapshot_manifest(paths.wiki_dir, snapshot_id)
     return summaries
 

@@ -128,9 +128,60 @@ def test_benchmark_commands_require_provider_config(tmp_path):
     try:
         run_command("run-wiki-queries", config, query_file=str(query_file))
     except ValueError as exc:
-        assert "llm.base_url is required" in str(exc)
+        assert "set llm.base_url or LLM_BASE_URL" in str(exc)
     else:
         raise AssertionError("Expected missing provider config to fail fast.")
+
+
+def test_benchmark_validation_accepts_env_only_provider_config(monkeypatch, tmp_path):
+    monkeypatch.setenv("LLM_BASE_URL", "http://example")
+    monkeypatch.setenv("LLM_API_KEY", "env-key")
+    config = AppConfig(
+        project_root=tmp_path,
+        llm=LLMConfig(provider="openai-compatible", base_url=None, api_key=None),
+    )
+    query_file = tmp_path / "queries.jsonl"
+    query_file.write_text(
+        json.dumps({"query_id": "q1", "question": "Q?", "category": "policy", "phase": "phase_1"}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("llm_wiki_vs_rag.runner.run_queries_for_system", lambda **kwargs: [])
+    captured: dict[str, object] = {}
+    monkeypatch.setattr("llm_wiki_vs_rag.runner.save_run_outputs", lambda records, output_path: captured.update({"ok": True}))
+
+    run_command("run-rag-queries", config, query_file=str(query_file))
+
+    assert captured["ok"] is True
+
+
+def test_wiki_ingest_rejects_mock_provider_even_when_unlocked(tmp_path):
+    config = AppConfig(
+        project_root=tmp_path,
+        benchmark={"locked": False},
+        llm=LLMConfig(provider="openai-compatible", mock_mode=True),
+    )
+
+    try:
+        run_command("wiki-ingest", config)
+    except ValueError as exc:
+        assert "cannot run with llm mock_mode enabled" in str(exc)
+    else:
+        raise AssertionError("Expected wiki-ingest benchmark path to reject mock provider config.")
+
+
+def test_wiki_ingest_rejects_invalid_provider_even_when_unlocked(tmp_path):
+    config = AppConfig(
+        project_root=tmp_path,
+        benchmark={"locked": False},
+        llm=LLMConfig(provider="mock", mock_mode=False),
+    )
+
+    try:
+        run_command("wiki-ingest", config)
+    except ValueError as exc:
+        assert "Unsupported benchmark LLM provider: mock" in str(exc)
+    else:
+        raise AssertionError("Expected wiki-ingest benchmark path to reject invalid provider config.")
 
 
 def test_cli_output_args_are_optional_and_runner_defaults_are_used(monkeypatch, tmp_path):
