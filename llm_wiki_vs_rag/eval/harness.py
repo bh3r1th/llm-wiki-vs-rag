@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+from collections import defaultdict, deque
 from pathlib import Path
 
 from llm_wiki_vs_rag.config import AppConfig
@@ -54,6 +55,7 @@ def _to_bool(raw: str) -> bool:
 def load_manual_labels(csv_path: Path) -> dict[tuple[str, str, str], ManualEvalLabel]:
     """Load manual human labels from CSV keyed by (system, query_id, phase)."""
     labels: dict[tuple[str, str, str], ManualEvalLabel] = {}
+    duplicate_keys: list[tuple[str, str, str]] = []
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
@@ -78,7 +80,20 @@ def load_manual_labels(csv_path: Path) -> dict[tuple[str, str, str], ManualEvalL
                 provenance_fidelity=_to_bool(row["provenance_fidelity"]),
                 evaluator_notes=row.get("evaluator_notes", ""),
             )
-            labels[(label.system, label.query_id, label.phase)] = label
+            key = (label.system, label.query_id, label.phase)
+            if key in labels:
+                duplicate_keys.append(key)
+                continue
+            labels[key] = label
+    if duplicate_keys:
+        sample = [
+            {"system": system, "query_id": query_id, "phase": phase}
+            for system, query_id, phase in duplicate_keys[:5]
+        ]
+        raise ValueError(
+            "Manual labels must be unique per (system, query_id, phase). "
+            f"duplicate_sample={sample}"
+        )
     return labels
 
 
@@ -99,11 +114,16 @@ def run_queries_for_system(
     else:
         raise ValueError(f"Unsupported system: {system}")
 
-    by_query = {item.query_id: item for item in query_cases}
+    by_query_id: dict[str, deque[EvalQueryCase]] = defaultdict(deque)
+    for item in query_cases:
+        by_query_id[item.query_id].append(item)
 
     normalized: list[RunOutputRecord] = []
     for result in results:
-        case = by_query[result.query_id]
+        queue = by_query_id.get(result.query_id)
+        if not queue:
+            raise ValueError(f"Run output query_id not found in query set for system={system}: {result.query_id}")
+        case = queue.popleft()
         normalized.append(
             RunOutputRecord(
                 query_id=result.query_id,

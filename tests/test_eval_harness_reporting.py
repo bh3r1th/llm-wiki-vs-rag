@@ -13,7 +13,7 @@ from llm_wiki_vs_rag.eval.harness import (
     run_queries_for_system,
 )
 from llm_wiki_vs_rag.eval.metrics import compute_drift, summarize_records
-from llm_wiki_vs_rag.eval.models import RunOutputRecord
+from llm_wiki_vs_rag.eval.models import EvalQueryCase, RunOutputRecord
 from llm_wiki_vs_rag.models import GenerationResult
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.eval.report import write_reports
@@ -321,6 +321,36 @@ def test_run_queries_for_system_wiki_records_written_snapshot_identity(monkeypat
     assert records[0].metadata.get("corpus_snapshot") == "sha256:wiki-snapshot"
 
 
+def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "llm_wiki_vs_rag.eval.harness.run_rag_queries",
+        lambda **_kwargs: [
+            GenerationResult(query_id="q1", answer="a1", mode="rag"),
+            GenerationResult(query_id="q1", answer="a2", mode="rag"),
+        ],
+    )
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": "sha256:rag-snapshot"}),
+        encoding="utf-8",
+    )
+    records = run_queries_for_system(
+        config=AppConfig(project_root=tmp_path),
+        paths=paths,
+        query_cases=[
+            EvalQueryCase(query_id="q1", question="Phase one question", category="policy", phase="phase_1"),
+            EvalQueryCase(query_id="q1", question="Phase two question", category="history", phase="phase_2"),
+        ],
+        system="rag",
+    )
+
+    assert [record.phase for record in records] == ["phase_1", "phase_2"]
+    assert [record.question for record in records] == ["Phase one question", "Phase two question"]
+    assert [record.category for record in records] == ["policy", "history"]
+
+
 def load_query_case(query_id: str, question: str):
     from llm_wiki_vs_rag.eval.models import EvalQueryCase
 
@@ -433,6 +463,29 @@ def test_load_manual_labels_fails_when_phase_missing(tmp_path):
         assert "must include a phase value" in str(exc)
     else:
         raise AssertionError("Expected labels without phase to fail.")
+
+
+def test_load_manual_labels_rejects_duplicate_system_query_phase_rows(tmp_path):
+    labels_path = tmp_path / "labels.csv"
+    labels_path.write_text(
+        "\n".join(
+            [
+                "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "rag,q1,phase_1,correct,full,correct,true,true,none,true,",
+                "rag,q1,phase_1,wrong,failed,stale,false,false,major,false,duplicate",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        load_manual_labels(labels_path)
+    except ValueError as exc:
+        assert "must be unique per (system, query_id, phase)" in str(exc)
+        assert "q1" in str(exc)
+        assert "phase_1" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate manual labels to fail.")
 
 
 def test_repeated_runs_within_same_second_have_distinct_run_ids():
