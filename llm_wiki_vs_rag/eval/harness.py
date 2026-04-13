@@ -32,15 +32,6 @@ def _resolve_corpus_snapshot_manifest(paths: ProjectPaths, system: str) -> dict:
     return payload
 
 
-def resolve_corpus_snapshot_identity(paths: ProjectPaths, system: str) -> str:
-    """Resolve a concrete corpus snapshot identifier for benchmark run outputs."""
-    payload = _resolve_corpus_snapshot_manifest(paths=paths, system=system)
-    snapshot_id = str(payload.get("snapshot_id", "")).strip()
-    if not snapshot_id:
-        raise ValueError(f"Missing snapshot_id in canonical snapshot manifest for {system}.")
-    return snapshot_id
-
-
 def load_query_cases(path: Path) -> list[EvalQueryCase]:
     """Load evaluation query cases from JSON or JSONL."""
     if path.suffix == ".jsonl":
@@ -184,14 +175,12 @@ def run_queries_for_system(
             config=config,
             paths=paths,
             query_cases=query_inputs,
-            corpus_snapshot=snapshot_identity,
         )
     elif system == "wiki":
         results = run_wiki_queries(
             config=config,
             paths=paths,
             query_cases=query_inputs,
-            corpus_snapshot=snapshot_identity,
         )
     else:
         raise ValueError(f"Unsupported system: {system}")

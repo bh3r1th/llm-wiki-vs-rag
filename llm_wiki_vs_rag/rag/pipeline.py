@@ -94,7 +94,6 @@ def answer_rag_query(
     config: AppConfig,
     paths: ProjectPaths,
     query: QueryCase,
-    corpus_snapshot: str | None = None,
 ) -> GenerationResult:
     """Answer a single query with the persisted RAG baseline."""
     index = load_index(paths.artifacts_dir)
@@ -105,7 +104,6 @@ def answer_rag_query(
         query=query,
         index=index,
         llm_client=llm_client,
-        corpus_snapshot=corpus_snapshot,
     )
 
 
@@ -158,7 +156,6 @@ def run_rag_queries(
     config: AppConfig,
     paths: ProjectPaths,
     query_cases: list[QueryCase],
-    corpus_snapshot: str | None = None,
 ) -> list[GenerationResult]:
     """Run the RAG baseline for a query set."""
     index = load_index(paths.artifacts_dir)
@@ -170,7 +167,6 @@ def run_rag_queries(
             query=query,
             index=index,
             llm_client=llm_client,
-            corpus_snapshot=corpus_snapshot,
         )
         for query in query_cases
     ]

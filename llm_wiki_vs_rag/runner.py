@@ -139,12 +139,20 @@ def _validate_phase_snapshot_integrity(outputs, context: str) -> None:
             f"Inconsistent corpus_order chronology token mapping in {context}: "
             f"phase_1={sorted(phase_order['phase_1'])}, phase_2={sorted(phase_order['phase_2'])}."
         )
-    phase_1_order = next(iter(phase_order["phase_1"]))
-    phase_2_order = next(iter(phase_order["phase_2"]))
+    phase_1_order_token = next(iter(phase_order["phase_1"]))
+    phase_2_order_token = next(iter(phase_order["phase_2"]))
+    try:
+        phase_1_order = int(phase_1_order_token)
+        phase_2_order = int(phase_2_order_token)
+    except ValueError as exc:
+        raise ValueError(
+            "Phase comparison requires numeric corpus_order chronology tokens in "
+            f"{context}, got phase_1={phase_1_order_token}, phase_2={phase_2_order_token}."
+        ) from exc
     if phase_1_order >= phase_2_order:
         raise ValueError(
             "Phase comparison requires provable chronology ordering where phase_1 is earlier than phase_2 in "
-            f"{context}, but corpus_order phase_1={phase_1_order}, phase_2={phase_2_order}."
+            f"{context}, but corpus_order phase_1={phase_1_order_token}, phase_2={phase_2_order_token}."
         )
 
 

@@ -6,11 +6,11 @@ import json
 import inspect
 from pathlib import Path
 
-from llm_wiki_vs_rag.config import AppConfig, BenchmarkConfig, LLMConfig, RAGConfig, WikiConfig
+from llm_wiki_vs_rag.config import AppConfig, BenchmarkConfig, LLMConfig, RAGConfig
 from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
 from llm_wiki_vs_rag.models import QueryCase, SourceDocument
 from llm_wiki_vs_rag.paths import ProjectPaths
-from llm_wiki_vs_rag.rag.pipeline import answer_rag_query
+from llm_wiki_vs_rag.rag.pipeline import answer_rag_query, run_rag_queries
 from llm_wiki_vs_rag.wiki.pipeline import ingest_wiki, run_wiki_queries
 from llm_wiki_vs_rag.wiki.prompting import build_wiki_query_prompt
 from llm_wiki_vs_rag.wiki.ingest import ingest_one_document
@@ -23,7 +23,6 @@ def test_locked_benchmark_uses_same_top_k_for_rag_and_wiki(monkeypatch, tmp_path
     config = AppConfig(
         project_root=tmp_path,
         rag=RAGConfig(top_k=4),
-        wiki=WikiConfig(query_top_k=4),
     )
     observed: list[int] = []
 
@@ -78,18 +77,24 @@ def test_run_wiki_queries_signature_has_no_fallback_parameter():
     assert "use_rag_fallback" not in inspect.signature(run_wiki_queries).parameters
 
 
-def test_locked_benchmark_fails_fast_on_top_k_parity_break():
+def test_run_wiki_queries_signature_has_no_snapshot_override_parameter():
+    assert "corpus_snapshot" not in inspect.signature(run_wiki_queries).parameters
+
+
+def test_answer_rag_query_signature_has_no_snapshot_override_parameter():
+    assert "corpus_snapshot" not in inspect.signature(answer_rag_query).parameters
+
+
+def test_run_rag_queries_signature_has_no_snapshot_override_parameter():
+    assert "corpus_snapshot" not in inspect.signature(run_rag_queries).parameters
+
+
+def test_retrieval_top_k_uses_shared_rag_budget():
     config = AppConfig(
         rag=RAGConfig(top_k=5),
-        wiki=WikiConfig(query_top_k=3),
         benchmark=BenchmarkConfig(locked=True),
     )
-    try:
-        config.retrieval_top_k()
-    except ValueError as exc:
-        assert "retrieval parity" in str(exc)
-    else:
-        raise AssertionError("Expected parity mismatch to fail fast in locked benchmark mode.")
+    assert config.retrieval_top_k() == 5
 
 
 def test_wiki_ingest_writes_canonical_snapshot_identity(monkeypatch, tmp_path):

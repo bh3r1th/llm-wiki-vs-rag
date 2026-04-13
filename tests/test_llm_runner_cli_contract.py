@@ -4,8 +4,9 @@ import json
 
 from llm_wiki_vs_rag.cli.main import build_parser
 from llm_wiki_vs_rag.config import AppConfig, LLMConfig
+from llm_wiki_vs_rag.eval.models import RunOutputRecord
 from llm_wiki_vs_rag.llm.client import LLMClient
-from llm_wiki_vs_rag.runner import run_command
+from llm_wiki_vs_rag.runner import _validate_phase_snapshot_integrity, run_command
 
 
 def test_deterministic_mock_mode_works_for_unit_tests():
@@ -624,6 +625,83 @@ def test_compare_systems_fails_when_phase_order_is_reversed(tmp_path):
         assert "phase_1 is earlier than phase_2" in str(exc)
     else:
         raise AssertionError("Expected compare-systems to fail when phase chronology ordering is reversed.")
+
+
+def test_phase_snapshot_integrity_compares_corpus_order_numerically_for_single_digits():
+    outputs = [
+        RunOutputRecord(
+            query_id="q1",
+            system="rag",
+            phase="phase_1",
+            question="Q1",
+            category="policy",
+            answer="A1",
+            metadata={"corpus_snapshot": "snap-1", "corpus_order": "9"},
+        ),
+        RunOutputRecord(
+            query_id="q2",
+            system="rag",
+            phase="phase_2",
+            question="Q2",
+            category="policy",
+            answer="A2",
+            metadata={"corpus_snapshot": "snap-2", "corpus_order": "10"},
+        ),
+    ]
+    _validate_phase_snapshot_integrity(outputs, context="unit-test-9-vs-10")
+
+
+def test_phase_snapshot_integrity_compares_corpus_order_numerically_for_triple_digits():
+    outputs = [
+        RunOutputRecord(
+            query_id="q1",
+            system="rag",
+            phase="phase_1",
+            question="Q1",
+            category="policy",
+            answer="A1",
+            metadata={"corpus_snapshot": "snap-1", "corpus_order": "99"},
+        ),
+        RunOutputRecord(
+            query_id="q2",
+            system="rag",
+            phase="phase_2",
+            question="Q2",
+            category="policy",
+            answer="A2",
+            metadata={"corpus_snapshot": "snap-2", "corpus_order": "100"},
+        ),
+    ]
+    _validate_phase_snapshot_integrity(outputs, context="unit-test-99-vs-100")
+
+
+def test_phase_snapshot_integrity_fails_on_non_numeric_order_tokens():
+    outputs = [
+        RunOutputRecord(
+            query_id="q1",
+            system="rag",
+            phase="phase_1",
+            question="Q1",
+            category="policy",
+            answer="A1",
+            metadata={"corpus_snapshot": "snap-1", "corpus_order": "phase-one"},
+        ),
+        RunOutputRecord(
+            query_id="q2",
+            system="rag",
+            phase="phase_2",
+            question="Q2",
+            category="policy",
+            answer="A2",
+            metadata={"corpus_snapshot": "snap-2", "corpus_order": "10"},
+        ),
+    ]
+    try:
+        _validate_phase_snapshot_integrity(outputs, context="unit-test-invalid-order-token")
+    except ValueError as exc:
+        assert "requires numeric corpus_order chronology tokens" in str(exc)
+    else:
+        raise AssertionError("Expected non-numeric corpus_order token to fail chronology validation.")
 
 
 def test_compare_systems_fails_when_cross_system_phase_snapshot_identity_differs(tmp_path):
