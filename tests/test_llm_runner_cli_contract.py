@@ -123,7 +123,7 @@ def test_compare_systems_fails_on_mismatched_query_cohorts(tmp_path):
     )
     labels_file = tmp_path / "labels.csv"
     labels_file.write_text(
-        "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
         encoding="utf-8",
     )
 
@@ -137,12 +137,12 @@ def test_compare_systems_fails_on_mismatched_query_cohorts(tmp_path):
             labels_file=str(labels_file),
         )
     except ValueError as exc:
-        assert "mismatched query_id cohorts" in str(exc)
+        assert "mismatched (query_id, phase) cohorts" in str(exc)
     else:
         raise AssertionError("Expected compare-systems to fail when query cohorts differ.")
 
 
-def test_compare_systems_fails_on_mismatched_phase_cohorts(tmp_path):
+def test_compare_systems_fails_when_query_phase_pairs_do_not_match(tmp_path):
     rag_run_file = tmp_path / "rag.jsonl"
     rag_run_file.write_text(
         json.dumps(
@@ -153,6 +153,17 @@ def test_compare_systems_fails_on_mismatched_phase_cohorts(tmp_path):
                 "question": "Q1",
                 "category": "policy",
                 "answer": "A1",
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "query_id": "q2",
+                "system": "rag",
+                "phase": "phase_2",
+                "question": "Q2",
+                "category": "policy",
+                "answer": "A2",
             }
         )
         + "\n",
@@ -170,12 +181,23 @@ def test_compare_systems_fails_on_mismatched_phase_cohorts(tmp_path):
                 "answer": "A1",
             }
         )
+        + "\n"
+        + json.dumps(
+            {
+                "query_id": "q2",
+                "system": "wiki",
+                "phase": "phase_1",
+                "question": "Q2",
+                "category": "policy",
+                "answer": "A2",
+            }
+        )
         + "\n",
         encoding="utf-8",
     )
     labels_file = tmp_path / "labels.csv"
     labels_file.write_text(
-        "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
         encoding="utf-8",
     )
 
@@ -189,6 +211,6 @@ def test_compare_systems_fails_on_mismatched_phase_cohorts(tmp_path):
             labels_file=str(labels_file),
         )
     except ValueError as exc:
-        assert "mismatched phase cohorts" in str(exc)
+        assert "mismatched (query_id, phase) cohorts" in str(exc)
     else:
-        raise AssertionError("Expected compare-systems to fail when phase cohorts differ.")
+        raise AssertionError("Expected compare-systems to fail when query/phase pair cohorts differ.")
