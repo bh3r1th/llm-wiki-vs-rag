@@ -134,7 +134,6 @@ def run_queries_for_system(
     query_cases: list[EvalQueryCase],
     system: str,
     target_phase: str | None = None,
-    snapshot_id: str | None = None,
 ) -> list[RunOutputRecord]:
     """Run one system over a query set and normalize outputs."""
     phases_present = {case.phase for case in query_cases}
@@ -168,7 +167,7 @@ def run_queries_for_system(
             "Each query case must have a unique (query_id, phase) identity per run. "
             f"duplicate_identity_sample={duplicate_identities[:5]}"
         )
-    snapshot_identity = snapshot_id or resolve_corpus_snapshot_identity(paths=paths, system=system)
+    snapshot_identity = resolve_corpus_snapshot_identity(paths=paths, system=system)
 
     if system == "rag":
         results = run_rag_queries(
@@ -189,6 +188,11 @@ def run_queries_for_system(
 
     seen_artifact_snapshots: set[str] = set()
     for result in results:
+        if result.mode != system:
+            raise ValueError(
+                "Run system attribution mismatch: "
+                f"expected result mode {system}, got {result.mode} for query_id={result.query_id}, run_id={result.run_id}."
+            )
         if not result.artifact_dir:
             raise ValueError(
                 "Missing artifact_dir for benchmark output row: "
@@ -203,6 +207,12 @@ def run_queries_for_system(
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
             raise ValueError(f"Invalid artifact metadata payload for system={system}: {metadata_path}")
+        artifact_mode = str(payload.get("mode", "")).strip()
+        if artifact_mode != system:
+            raise ValueError(
+                "Run system attribution mismatch: "
+                f"expected artifact mode {system}, got {artifact_mode or '<missing>'}, path={metadata_path}."
+            )
         artifact_snapshot = str(payload.get("corpus_snapshot", "")).strip()
         if not artifact_snapshot:
             raise ValueError(

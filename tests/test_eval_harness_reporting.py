@@ -315,8 +315,8 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
     artifact_two = tmp_path / "art" / "2"
     artifact_one.mkdir(parents=True, exist_ok=True)
     artifact_two.mkdir(parents=True, exist_ok=True)
-    (artifact_one / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
-    (artifact_two / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_one / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_two / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
 
     def _fake_rag(**_kwargs):
         return [
@@ -353,7 +353,7 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
 def test_run_queries_for_system_wiki_records_written_snapshot_identity(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "art" / "w1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:wiki-snapshot"}), encoding="utf-8")
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "wiki", "corpus_snapshot": "sha256:wiki-snapshot"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_wiki_queries",
         lambda **_kwargs: [
@@ -373,13 +373,48 @@ def test_run_queries_for_system_wiki_records_written_snapshot_identity(monkeypat
     assert records[0].metadata.get("corpus_snapshot") == "sha256:wiki-snapshot"
 
 
+def test_run_queries_for_system_derives_snapshot_from_runtime_manifest(monkeypatch, tmp_path):
+    artifact_dir = tmp_path / "art" / "r1"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "metadata.json").write_text(
+        json.dumps({"mode": "rag", "corpus_snapshot": "sha256:runtime-manifest"}),
+        encoding="utf-8",
+    )
+    captured: dict[str, str | None] = {}
+
+    def _fake_rag(**kwargs):
+        captured["corpus_snapshot"] = kwargs.get("corpus_snapshot")
+        return [
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="rag", run_id="r1", artifact_dir=str(artifact_dir))
+        ]
+
+    monkeypatch.setattr("llm_wiki_vs_rag.eval.harness.run_rag_queries", _fake_rag)
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": "sha256:runtime-manifest"}),
+        encoding="utf-8",
+    )
+
+    records = run_queries_for_system(
+        config=AppConfig(project_root=tmp_path),
+        paths=paths,
+        query_cases=[load_query_case("q1", "Q1")],
+        system="rag",
+    )
+
+    assert captured["corpus_snapshot"] == "sha256:runtime-manifest"
+    assert records[0].metadata.get("corpus_snapshot") == "sha256:runtime-manifest"
+
+
 def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monkeypatch, tmp_path):
     artifact_one = tmp_path / "art" / "repeat-1"
     artifact_two = tmp_path / "art" / "repeat-2"
     artifact_one.mkdir(parents=True, exist_ok=True)
     artifact_two.mkdir(parents=True, exist_ok=True)
-    (artifact_one / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
-    (artifact_two / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_one / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_two / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
@@ -433,10 +468,10 @@ def test_run_queries_for_system_fails_on_mixed_phases_without_explicit_phase_bin
         raise AssertionError("Expected mixed-phase query invocation without explicit phase binding to fail.")
 
 
-def test_run_queries_for_system_accepts_explicit_phase_and_snapshot_binding(monkeypatch, tmp_path):
+def test_run_queries_for_system_accepts_explicit_phase_binding_with_runtime_snapshot(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:phase-2-snapshot"}), encoding="utf-8")
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:phase-2-snapshot"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
@@ -445,6 +480,11 @@ def test_run_queries_for_system_accepts_explicit_phase_and_snapshot_binding(monk
     )
     paths = ProjectPaths(project_root=tmp_path)
     paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": "sha256:phase-2-snapshot"}),
+        encoding="utf-8",
+    )
     records = run_queries_for_system(
         config=AppConfig(project_root=tmp_path),
         paths=paths,
@@ -454,7 +494,6 @@ def test_run_queries_for_system_accepts_explicit_phase_and_snapshot_binding(monk
         ],
         system="rag",
         target_phase="phase_2",
-        snapshot_id="sha256:phase-2-snapshot",
     )
     assert len(records) == 1
     assert records[0].phase == "phase_2"
@@ -466,8 +505,8 @@ def test_run_queries_normalization_is_order_independent(monkeypatch, tmp_path):
     artifact_two = tmp_path / "art" / "reordered-2"
     artifact_one.mkdir(parents=True, exist_ok=True)
     artifact_two.mkdir(parents=True, exist_ok=True)
-    (artifact_one / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
-    (artifact_two / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_one / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_two / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
 
     def _fake_rag(**_kwargs):
         return [
@@ -503,7 +542,7 @@ def test_run_queries_normalization_is_order_independent(monkeypatch, tmp_path):
 def test_run_queries_for_system_fails_on_snapshot_mismatch_in_artifact_metadata(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:stale-snapshot"}), encoding="utf-8")
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:stale-snapshot"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
@@ -534,7 +573,7 @@ def test_run_queries_for_system_fails_on_snapshot_mismatch_in_artifact_metadata(
 def test_run_queries_for_system_fails_when_artifact_snapshot_missing(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "metadata.json").write_text(json.dumps({"query_id": "q1"}), encoding="utf-8")
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "query_id": "q1"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
@@ -560,6 +599,64 @@ def test_run_queries_for_system_fails_when_artifact_snapshot_missing(monkeypatch
         assert "Missing corpus_snapshot in per-query artifact metadata" in str(exc)
     else:
         raise AssertionError("Expected missing artifact corpus_snapshot to fail fast.")
+
+
+def test_run_queries_for_system_fails_on_result_mode_mismatch(monkeypatch, tmp_path):
+    artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "wiki", "corpus_snapshot": "sha256:canonical-snapshot"}), encoding="utf-8")
+    monkeypatch.setattr(
+        "llm_wiki_vs_rag.eval.harness.run_rag_queries",
+        lambda **_kwargs: [
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="wiki", artifact_dir=str(artifact_dir)),
+        ],
+    )
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": "sha256:canonical-snapshot"}),
+        encoding="utf-8",
+    )
+
+    try:
+        run_queries_for_system(
+            config=AppConfig(project_root=tmp_path),
+            paths=paths,
+            query_cases=[load_query_case("q1", "Q1")],
+            system="rag",
+        )
+    except ValueError as exc:
+        assert "expected result mode rag, got wiki" in str(exc)
+    else:
+        raise AssertionError("Expected rag benchmark run to fail on mismatched result mode.")
+
+
+def test_run_queries_for_system_fails_on_artifact_mode_mismatch(monkeypatch, tmp_path):
+    artifact_dir = tmp_path / "artifacts" / "wiki_runs" / "run-1"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:wiki-snapshot"}), encoding="utf-8")
+    monkeypatch.setattr(
+        "llm_wiki_vs_rag.eval.harness.run_wiki_queries",
+        lambda **_kwargs: [
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="wiki", artifact_dir=str(artifact_dir)),
+        ],
+    )
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.wiki_dir / "snapshot.json").write_text(json.dumps({"snapshot_id": "sha256:wiki-snapshot"}), encoding="utf-8")
+
+    try:
+        run_queries_for_system(
+            config=AppConfig(project_root=tmp_path),
+            paths=paths,
+            query_cases=[load_query_case("q1", "Q1")],
+            system="wiki",
+        )
+    except ValueError as exc:
+        assert "expected artifact mode wiki, got rag" in str(exc)
+    else:
+        raise AssertionError("Expected wiki benchmark run to fail on mismatched artifact mode.")
 
 
 def load_query_case(query_id: str, question: str):

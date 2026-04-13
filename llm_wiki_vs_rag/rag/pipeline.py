@@ -57,6 +57,7 @@ def _write_query_artifacts(
     metadata = {
         "run_id": run_id,
         "query_id": query.query_id,
+        "mode": "rag",
         "question": query.question,
         "requested_top_k": requested_top_k,
         "returned_top_k": len(retrieved_chunks),
