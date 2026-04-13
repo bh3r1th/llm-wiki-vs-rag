@@ -10,10 +10,12 @@ import numpy as np
 from llm_wiki_vs_rag.config import AppConfig
 from llm_wiki_vs_rag.models import DocumentBatch, QueryCase, RetrievedChunk, SourceDocument
 from llm_wiki_vs_rag.paths import ProjectPaths
+from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
 from llm_wiki_vs_rag.rag.chunking import chunk_document
 from llm_wiki_vs_rag.rag.indexing import RAGIndex, _embed_text, build_in_memory_index, persist_index
 from llm_wiki_vs_rag.rag.pipeline import answer_rag_query, build_rag_index, run_rag_queries
 from llm_wiki_vs_rag.rag.retrieve import retrieve_top_k
+from llm_wiki_vs_rag.reproducibility import compute_execution_fingerprint
 
 
 def test_chunking_is_deterministic(tmp_path):
@@ -112,7 +114,12 @@ def test_pipeline_saves_query_artifacts(tmp_path):
     config = AppConfig(project_root=tmp_path)
     batch = DocumentBatch(documents=[SourceDocument(doc_id="001_doc", source_path=raw_doc, text=raw_doc.read_text())])
     index = build_in_memory_index(batch=batch, chunk_size_chars=20, chunk_overlap_chars=5)
-    persist_index(index=index, artifacts_dir=paths.artifacts_dir, snapshot_id="sha256:test")
+    persist_index(
+        index=index,
+        artifacts_dir=paths.artifacts_dir,
+        snapshot_id="sha256:test",
+        execution_fingerprint=compute_execution_fingerprint(config=config, system="rag"),
+    )
 
     result = answer_rag_query(config=config, paths=paths, query=QueryCase(query_id="q1", question="alpha?"))
     assert result.query_id == "q1"
@@ -129,6 +136,7 @@ def test_pipeline_saves_query_artifacts(tmp_path):
     metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["query_id"] == "q1"
     assert metadata["corpus_snapshot"] == "sha256:test"
+    assert str(metadata["execution_fingerprint"]).startswith("sha256:")
     assert metadata["requested_top_k"] == config.rag.top_k
     assert metadata["returned_top_k"] <= metadata["requested_top_k"]
 
@@ -143,13 +151,24 @@ def test_build_rag_index_writes_canonical_snapshot_identity(tmp_path):
 
     manifest = json.loads((paths.artifacts_dir / "rag_index" / "manifest.json").read_text(encoding="utf-8"))
     assert str(manifest["snapshot_id"]).startswith("sha256:")
+    assert str(manifest["execution_fingerprint"]).startswith("sha256:")
 
 
 def test_run_rag_queries_reuses_loaded_index_and_llm_client(monkeypatch, tmp_path):
     paths = ProjectPaths(project_root=tmp_path)
     paths.ensure()
+    (paths.raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
-    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text('{"snapshot_id":"sha256:test"}', encoding="utf-8")
+    snapshot_id = fingerprint_document_batch(load_source_documents(paths.raw_dir))
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "snapshot_id": snapshot_id,
+                "execution_fingerprint": compute_execution_fingerprint(config=AppConfig(project_root=tmp_path), system="rag"),
+            }
+        ),
+        encoding="utf-8",
+    )
     load_calls = {"count": 0}
     client_inits = {"count": 0}
 

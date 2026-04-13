@@ -16,6 +16,7 @@ from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.rag.indexing import build_in_memory_index, load_index, persist_index
 from llm_wiki_vs_rag.rag.prompting import build_rag_prompt
 from llm_wiki_vs_rag.rag.retrieve import retrieve_top_k
+from llm_wiki_vs_rag.reproducibility import compute_execution_fingerprint, validate_current_raw_corpus_snapshot
 
 
 def _new_run_id(prefix: str) -> str:
@@ -23,13 +24,16 @@ def _new_run_id(prefix: str) -> str:
     return f"{prefix}-{timestamp}-{uuid4().hex[:8]}"
 
 
-def _resolve_rag_snapshot_identity(paths: ProjectPaths) -> str:
+def _resolve_rag_manifest(paths: ProjectPaths) -> tuple[str, str]:
     manifest_path = paths.artifacts_dir / "rag_index" / "manifest.json"
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     snapshot_id = str(payload.get("snapshot_id", "")).strip()
     if not snapshot_id:
         raise ValueError(f"Missing snapshot_id in canonical snapshot manifest for rag: {manifest_path}")
-    return snapshot_id
+    execution_fingerprint = str(payload.get("execution_fingerprint", "")).strip()
+    if not execution_fingerprint:
+        raise ValueError(f"Missing execution_fingerprint in canonical snapshot manifest for rag: {manifest_path}")
+    return snapshot_id, execution_fingerprint
 
 
 def _write_query_artifacts(
@@ -41,6 +45,7 @@ def _write_query_artifacts(
     retrieved_chunks: list,
     requested_top_k: int,
     corpus_snapshot: str,
+    execution_fingerprint: str,
     prompt_tokens: int,
     completion_tokens: int,
     total_tokens: int,
@@ -62,6 +67,7 @@ def _write_query_artifacts(
         "requested_top_k": requested_top_k,
         "returned_top_k": len(retrieved_chunks),
         "corpus_snapshot": corpus_snapshot,
+        "execution_fingerprint": execution_fingerprint,
         "token_usage": {
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
@@ -76,6 +82,7 @@ def build_rag_index(config: AppConfig, paths: ProjectPaths):
     """Build and persist a local RAG index from source documents."""
     batch = load_source_documents(paths.raw_dir)
     snapshot_id = fingerprint_document_batch(batch)
+    execution_fingerprint = compute_execution_fingerprint(config=config, system="rag")
     index = build_in_memory_index(
         batch=batch,
         chunk_size_chars=config.rag.chunk_size,
@@ -85,6 +92,7 @@ def build_rag_index(config: AppConfig, paths: ProjectPaths):
         index=index,
         artifacts_dir=paths.artifacts_dir,
         snapshot_id=snapshot_id,
+        execution_fingerprint=execution_fingerprint,
         corpus_order=corpus_order_token(batch),
     )
     return index
@@ -113,9 +121,10 @@ def _answer_rag_query_with_resources(
     query: QueryCase,
     index,
     llm_client: LLMClient,
-    corpus_snapshot: str | None = None,
 ) -> GenerationResult:
     """Answer one query using preloaded RAG resources."""
+    snapshot_id, execution_fingerprint = _resolve_rag_manifest(paths)
+    validate_current_raw_corpus_snapshot(paths=paths, expected_snapshot=snapshot_id, system="rag")
     start = perf_counter()
     requested_top_k = config.retrieval_top_k()
     chunks = retrieve_top_k(index=index, query=query.question, top_k=requested_top_k)
@@ -131,7 +140,8 @@ def _answer_rag_query_with_resources(
         answer=answer,
         retrieved_chunks=chunks,
         requested_top_k=requested_top_k,
-        corpus_snapshot=corpus_snapshot or _resolve_rag_snapshot_identity(paths),
+        corpus_snapshot=snapshot_id,
+        execution_fingerprint=execution_fingerprint,
         prompt_tokens=llm_response.token_usage.prompt_tokens,
         completion_tokens=llm_response.token_usage.completion_tokens,
         total_tokens=llm_response.token_usage.total_tokens,

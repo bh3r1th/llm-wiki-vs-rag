@@ -314,8 +314,8 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
     artifact_two = tmp_path / "art" / "2"
     artifact_one.mkdir(parents=True, exist_ok=True)
     artifact_two.mkdir(parents=True, exist_ok=True)
-    (artifact_one / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
-    (artifact_two / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_one / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot", "execution_fingerprint": "sha256:exec-rag"}), encoding="utf-8")
+    (artifact_two / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot", "execution_fingerprint": "sha256:exec-rag"}), encoding="utf-8")
 
     def _fake_rag(**_kwargs):
         return [
@@ -328,7 +328,7 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
     paths.ensure()
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        json.dumps({"snapshot_id": "sha256:rag-snapshot"}),
+        json.dumps({"snapshot_id": "sha256:rag-snapshot", "execution_fingerprint": "sha256:exec-rag"}),
         encoding="utf-8",
     )
     records = run_queries_for_system(
@@ -352,7 +352,7 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
 def test_run_queries_for_system_wiki_records_written_snapshot_identity(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "art" / "w1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "wiki", "corpus_snapshot": "sha256:wiki-snapshot"}), encoding="utf-8")
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "wiki", "corpus_snapshot": "sha256:wiki-snapshot", "execution_fingerprint": "sha256:exec-wiki"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_wiki_queries",
         lambda **_kwargs: [
@@ -361,7 +361,7 @@ def test_run_queries_for_system_wiki_records_written_snapshot_identity(monkeypat
     )
     paths = ProjectPaths(project_root=tmp_path)
     paths.ensure()
-    (paths.wiki_dir / "snapshot.json").write_text(json.dumps({"snapshot_id": "sha256:wiki-snapshot"}), encoding="utf-8")
+    (paths.wiki_dir / "snapshot.json").write_text(json.dumps({"snapshot_id": "sha256:wiki-snapshot", "execution_fingerprint": "sha256:exec-wiki"}), encoding="utf-8")
 
     records = run_queries_for_system(
         config=AppConfig(project_root=tmp_path),
@@ -376,7 +376,13 @@ def test_run_queries_for_system_derives_snapshot_from_runtime_manifest(monkeypat
     artifact_dir = tmp_path / "art" / "r1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "metadata.json").write_text(
-        json.dumps({"mode": "rag", "corpus_snapshot": "sha256:runtime-manifest"}),
+        json.dumps(
+            {
+                "mode": "rag",
+                "corpus_snapshot": "sha256:runtime-manifest",
+                "execution_fingerprint": "sha256:exec-rag",
+            }
+        ),
         encoding="utf-8",
     )
     captured: dict[str, str | None] = {}
@@ -392,7 +398,7 @@ def test_run_queries_for_system_derives_snapshot_from_runtime_manifest(monkeypat
     paths.ensure()
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        json.dumps({"snapshot_id": "sha256:runtime-manifest"}),
+        json.dumps({"snapshot_id": "sha256:runtime-manifest", "execution_fingerprint": "sha256:exec-rag"}),
         encoding="utf-8",
     )
 
@@ -405,6 +411,7 @@ def test_run_queries_for_system_derives_snapshot_from_runtime_manifest(monkeypat
 
     assert "corpus_snapshot" not in captured["kwargs"]
     assert records[0].metadata.get("corpus_snapshot") == "sha256:runtime-manifest"
+    assert records[0].metadata.get("execution_fingerprint") == "sha256:exec-rag"
 
 
 def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monkeypatch, tmp_path):
@@ -412,8 +419,8 @@ def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monke
     artifact_two = tmp_path / "art" / "repeat-2"
     artifact_one.mkdir(parents=True, exist_ok=True)
     artifact_two.mkdir(parents=True, exist_ok=True)
-    (artifact_one / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
-    (artifact_two / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_one / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot", "execution_fingerprint": "sha256:exec-rag"}), encoding="utf-8")
+    (artifact_two / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot", "execution_fingerprint": "sha256:exec-rag"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
@@ -425,7 +432,7 @@ def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monke
     paths.ensure()
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        json.dumps({"snapshot_id": "sha256:rag-snapshot"}),
+        json.dumps({"snapshot_id": "sha256:rag-snapshot", "execution_fingerprint": "sha256:exec-rag"}),
         encoding="utf-8",
     )
     records = run_queries_for_system(
@@ -448,7 +455,7 @@ def test_run_queries_for_system_fails_on_mixed_phases_without_explicit_phase_bin
     paths.ensure()
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        json.dumps({"snapshot_id": "sha256:canonical-snapshot"}),
+        json.dumps({"snapshot_id": "sha256:canonical-snapshot", "execution_fingerprint": "sha256:exec-rag"}),
         encoding="utf-8",
     )
     try:
@@ -470,7 +477,7 @@ def test_run_queries_for_system_fails_on_mixed_phases_without_explicit_phase_bin
 def test_run_queries_for_system_accepts_explicit_phase_binding_with_runtime_snapshot(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:phase-2-snapshot"}), encoding="utf-8")
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:phase-2-snapshot", "execution_fingerprint": "sha256:exec-rag"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
@@ -481,7 +488,7 @@ def test_run_queries_for_system_accepts_explicit_phase_binding_with_runtime_snap
     paths.ensure()
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        json.dumps({"snapshot_id": "sha256:phase-2-snapshot"}),
+        json.dumps({"snapshot_id": "sha256:phase-2-snapshot", "execution_fingerprint": "sha256:exec-rag"}),
         encoding="utf-8",
     )
     records = run_queries_for_system(
@@ -504,8 +511,8 @@ def test_run_queries_normalization_is_order_independent(monkeypatch, tmp_path):
     artifact_two = tmp_path / "art" / "reordered-2"
     artifact_one.mkdir(parents=True, exist_ok=True)
     artifact_two.mkdir(parents=True, exist_ok=True)
-    (artifact_one / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
-    (artifact_two / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_one / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot", "execution_fingerprint": "sha256:exec-rag"}), encoding="utf-8")
+    (artifact_two / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:rag-snapshot", "execution_fingerprint": "sha256:exec-rag"}), encoding="utf-8")
 
     def _fake_rag(**_kwargs):
         return [
@@ -518,7 +525,7 @@ def test_run_queries_normalization_is_order_independent(monkeypatch, tmp_path):
     paths.ensure()
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        json.dumps({"snapshot_id": "sha256:rag-snapshot"}),
+        json.dumps({"snapshot_id": "sha256:rag-snapshot", "execution_fingerprint": "sha256:exec-rag"}),
         encoding="utf-8",
     )
 
@@ -541,7 +548,7 @@ def test_run_queries_normalization_is_order_independent(monkeypatch, tmp_path):
 def test_run_queries_for_system_fails_on_snapshot_mismatch_in_artifact_metadata(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:stale-snapshot"}), encoding="utf-8")
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:stale-snapshot", "execution_fingerprint": "sha256:exec-rag"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
@@ -552,7 +559,7 @@ def test_run_queries_for_system_fails_on_snapshot_mismatch_in_artifact_metadata(
     paths.ensure()
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        json.dumps({"snapshot_id": "sha256:canonical-snapshot"}),
+        json.dumps({"snapshot_id": "sha256:canonical-snapshot", "execution_fingerprint": "sha256:exec-rag"}),
         encoding="utf-8",
     )
 
@@ -583,7 +590,7 @@ def test_run_queries_for_system_fails_when_artifact_snapshot_missing(monkeypatch
     paths.ensure()
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        json.dumps({"snapshot_id": "sha256:canonical-snapshot"}),
+        json.dumps({"snapshot_id": "sha256:canonical-snapshot", "execution_fingerprint": "sha256:exec-rag"}),
         encoding="utf-8",
     )
 
@@ -603,7 +610,7 @@ def test_run_queries_for_system_fails_when_artifact_snapshot_missing(monkeypatch
 def test_run_queries_for_system_fails_on_result_mode_mismatch(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "wiki", "corpus_snapshot": "sha256:canonical-snapshot"}), encoding="utf-8")
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "wiki", "corpus_snapshot": "sha256:canonical-snapshot", "execution_fingerprint": "sha256:exec-wiki"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
@@ -614,7 +621,7 @@ def test_run_queries_for_system_fails_on_result_mode_mismatch(monkeypatch, tmp_p
     paths.ensure()
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        json.dumps({"snapshot_id": "sha256:canonical-snapshot"}),
+        json.dumps({"snapshot_id": "sha256:canonical-snapshot", "execution_fingerprint": "sha256:exec-rag"}),
         encoding="utf-8",
     )
 
@@ -634,7 +641,7 @@ def test_run_queries_for_system_fails_on_result_mode_mismatch(monkeypatch, tmp_p
 def test_run_queries_for_system_fails_on_artifact_mode_mismatch(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "artifacts" / "wiki_runs" / "run-1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:wiki-snapshot"}), encoding="utf-8")
+    (artifact_dir / "metadata.json").write_text(json.dumps({"mode": "rag", "corpus_snapshot": "sha256:wiki-snapshot", "execution_fingerprint": "sha256:exec-wiki"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_wiki_queries",
         lambda **_kwargs: [
@@ -643,7 +650,7 @@ def test_run_queries_for_system_fails_on_artifact_mode_mismatch(monkeypatch, tmp
     )
     paths = ProjectPaths(project_root=tmp_path)
     paths.ensure()
-    (paths.wiki_dir / "snapshot.json").write_text(json.dumps({"snapshot_id": "sha256:wiki-snapshot"}), encoding="utf-8")
+    (paths.wiki_dir / "snapshot.json").write_text(json.dumps({"snapshot_id": "sha256:wiki-snapshot", "execution_fingerprint": "sha256:exec-wiki"}), encoding="utf-8")
 
     try:
         run_queries_for_system(
@@ -834,7 +841,7 @@ def test_run_queries_for_system_wiki_path_cannot_pass_snapshot_override(monkeypa
     artifact_dir = tmp_path / "art" / "w1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "metadata.json").write_text(
-        json.dumps({"mode": "wiki", "corpus_snapshot": "sha256:wiki-runtime"}),
+        json.dumps({"mode": "wiki", "corpus_snapshot": "sha256:wiki-runtime", "execution_fingerprint": "sha256:exec-wiki"}),
         encoding="utf-8",
     )
     captured: dict[str, list[str]] = {}
@@ -848,7 +855,7 @@ def test_run_queries_for_system_wiki_path_cannot_pass_snapshot_override(monkeypa
     monkeypatch.setattr("llm_wiki_vs_rag.eval.harness.run_wiki_queries", _fake_wiki)
     paths = ProjectPaths(project_root=tmp_path)
     paths.ensure()
-    (paths.wiki_dir / "snapshot.json").write_text(json.dumps({"snapshot_id": "sha256:wiki-runtime"}), encoding="utf-8")
+    (paths.wiki_dir / "snapshot.json").write_text(json.dumps({"snapshot_id": "sha256:wiki-runtime", "execution_fingerprint": "sha256:exec-wiki"}), encoding="utf-8")
 
     records = run_queries_for_system(
         config=AppConfig(project_root=tmp_path),

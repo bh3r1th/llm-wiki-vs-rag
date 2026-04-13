@@ -1,6 +1,6 @@
 """Top-level package for llm_wiki_vs_rag."""
 
-from .config import AppConfig, LLMConfig, RAGConfig, WikiConfig
+from .config import AppConfig, LLMConfig, RAGConfig
 from .models import (
     DocumentBatch,
     GenerationResult,
@@ -12,7 +12,6 @@ from .models import (
 __all__ = [
     "AppConfig",
     "RAGConfig",
-    "WikiConfig",
     "LLMConfig",
     "SourceDocument",
     "DocumentBatch",

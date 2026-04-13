@@ -13,6 +13,7 @@ from llm_wiki_vs_rag.data.load_docs import corpus_order_token, fingerprint_docum
 from llm_wiki_vs_rag.llm.client import LLMClient
 from llm_wiki_vs_rag.models import GenerationResult, QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
+from llm_wiki_vs_rag.reproducibility import compute_execution_fingerprint, validate_current_raw_corpus_snapshot
 from llm_wiki_vs_rag.wiki.ingest import ingest_one_document
 from llm_wiki_vs_rag.wiki.pages import load_pages
 from llm_wiki_vs_rag.wiki.prompting import build_wiki_query_prompt
@@ -30,19 +31,34 @@ def _new_ingest_run_id(snapshot_id: str) -> str:
     return f"{snapshot_slug}-{timestamp}-{uuid4().hex[:8]}"
 
 
-def _resolve_wiki_snapshot_identity(paths: ProjectPaths) -> str:
+def _resolve_wiki_snapshot_manifest(paths: ProjectPaths) -> tuple[str, str]:
     manifest_path = paths.wiki_dir / "snapshot.json"
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     snapshot_id = str(payload.get("snapshot_id", "")).strip()
     if not snapshot_id:
         raise ValueError(f"Missing snapshot_id in canonical snapshot manifest for wiki: {manifest_path}")
-    return snapshot_id
+    execution_fingerprint = str(payload.get("execution_fingerprint", "")).strip()
+    if not execution_fingerprint:
+        raise ValueError(f"Missing execution_fingerprint in canonical snapshot manifest for wiki: {manifest_path}")
+    return snapshot_id, execution_fingerprint
 
 
-def _write_wiki_snapshot_manifest(wiki_dir: Path, snapshot_id: str, corpus_order: str | None = None) -> None:
+def _write_wiki_snapshot_manifest(
+    wiki_dir: Path,
+    snapshot_id: str,
+    execution_fingerprint: str,
+    corpus_order: str | None = None,
+) -> None:
     manifest_path = wiki_dir / "snapshot.json"
     manifest_path.write_text(
-        json.dumps({"snapshot_id": snapshot_id, "corpus_order": corpus_order}, indent=2),
+        json.dumps(
+            {
+                "snapshot_id": snapshot_id,
+                "execution_fingerprint": execution_fingerprint,
+                "corpus_order": corpus_order,
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
@@ -51,6 +67,7 @@ def ingest_wiki(config: AppConfig, paths: ProjectPaths):
     """Process raw docs sequentially and update markdown wiki incrementally."""
     batch = load_source_documents(paths.raw_dir)
     snapshot_id = fingerprint_document_batch(batch)
+    execution_fingerprint = compute_execution_fingerprint(config=config, system="wiki")
     ingest_run_id = _new_ingest_run_id(snapshot_id)
     llm_client = LLMClient(config=config.llm)
     summaries = []
@@ -64,7 +81,12 @@ def ingest_wiki(config: AppConfig, paths: ProjectPaths):
                 corpus_snapshot=snapshot_id,
             )
         )
-    _write_wiki_snapshot_manifest(paths.wiki_dir, snapshot_id, corpus_order=corpus_order_token(batch))
+    _write_wiki_snapshot_manifest(
+        paths.wiki_dir,
+        snapshot_id,
+        execution_fingerprint=execution_fingerprint,
+        corpus_order=corpus_order_token(batch),
+    )
     return summaries
 
 
@@ -77,7 +99,8 @@ def run_wiki_queries(
     pages = load_pages(paths.wiki_dir)
     llm_client = LLMClient(config=config.llm)
     top_k = config.retrieval_top_k()
-    snapshot_identity = _resolve_wiki_snapshot_identity(paths)
+    snapshot_identity, execution_fingerprint = _resolve_wiki_snapshot_manifest(paths)
+    validate_current_raw_corpus_snapshot(paths=paths, expected_snapshot=snapshot_identity, system="wiki")
 
     results: list[GenerationResult] = []
     for query in query_cases:
@@ -105,6 +128,7 @@ def run_wiki_queries(
                     "mode": "wiki",
                     "used_context_ids": [page.slug for page in selected_pages],
                     "corpus_snapshot": snapshot_identity,
+                    "execution_fingerprint": execution_fingerprint,
                     "token_usage": {
                         "prompt_tokens": llm_response.token_usage.prompt_tokens,
                         "completion_tokens": llm_response.token_usage.completion_tokens,
