@@ -29,6 +29,9 @@ def build_parser() -> argparse.ArgumentParser:
         eval_parser.add_argument("--labels-file", type=Path, required=True)
         eval_parser.add_argument("--output-dir", type=Path)
 
+    freeze_parser = subparsers.add_parser("freeze-corpus")
+    freeze_parser.add_argument("--dataset-root", type=Path, required=True)
+
     compare_parser = subparsers.add_parser("compare-systems")
     compare_parser.add_argument("--rag-run-file", type=Path, required=True)
     compare_parser.add_argument("--wiki-run-file", type=Path, required=True)
