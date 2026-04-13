@@ -40,15 +40,6 @@ class RetrievedChunk(BaseModel):
     score: float = 0.0
 
 
-class WikiPage(BaseModel):
-    """Ingest-time synthesized wiki page."""
-
-    page_id: str = Field(min_length=1)
-    title: str = Field(min_length=1)
-    body: str = Field(min_length=1)
-    links: list[str] = Field(default_factory=list)
-
-
 class GenerationResult(BaseModel):
     """Final generated answer and optional trace information."""
 
@@ -59,20 +50,3 @@ class GenerationResult(BaseModel):
     run_id: str | None = None
     latency_ms: float | None = Field(default=None, ge=0)
     artifact_dir: str | None = None
-
-
-class EvalRecord(BaseModel):
-    """Evaluation record for one query."""
-
-    query_id: str = Field(min_length=1)
-    mode: str = Field(min_length=1)
-    score: float = 0.0
-    notes: str | None = None
-
-
-class RunArtifact(BaseModel):
-    """Artifact emitted by a runner step."""
-
-    run_id: str = Field(min_length=1)
-    artifact_path: Path
-    artifact_type: str = Field(min_length=1)

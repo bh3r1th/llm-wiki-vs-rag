@@ -9,18 +9,6 @@ from llm_wiki_vs_rag.config import AppConfig
 from llm_wiki_vs_rag.logging_utils import configure_logging
 from llm_wiki_vs_rag.runner import run_command
 
-
-SUPPORTED_COMMANDS = (
-    "build-rag-index",
-    "wiki-ingest",
-    "run-rag-queries",
-    "run-wiki-queries",
-    "evaluate-rag",
-    "evaluate-wiki",
-    "compare-systems",
-)
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Build CLI argument parser."""
     parser = argparse.ArgumentParser(description="llm-wiki-vs-rag benchmark runner")

@@ -3,13 +3,10 @@
 from .config import AppConfig, EvalConfig, LLMConfig, RAGConfig, WikiConfig
 from .models import (
     DocumentBatch,
-    EvalRecord,
     GenerationResult,
     QueryCase,
     RetrievedChunk,
-    RunArtifact,
     SourceDocument,
-    WikiPage,
 )
 
 __all__ = [
@@ -22,8 +19,5 @@ __all__ = [
     "DocumentBatch",
     "QueryCase",
     "RetrievedChunk",
-    "WikiPage",
     "GenerationResult",
-    "EvalRecord",
-    "RunArtifact",
 ]
