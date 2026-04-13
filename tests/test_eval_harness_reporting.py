@@ -51,9 +51,9 @@ def test_load_manual_labels(tmp_path):
     labels_path.write_text(
         "\n".join(
             [
-                "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
-                "rag,q1,correct,full,correct,true,true,none,true,looks good",
-                "wiki,q2,wrong,failed,stale,false,false,major,false,bad output",
+                "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "rag,q1,phase_1,correct,full,correct,true,true,none,true,looks good",
+                "wiki,q2,phase_2,wrong,failed,stale,false,false,major,false,bad output",
             ]
         ),
         encoding="utf-8",
@@ -61,16 +61,16 @@ def test_load_manual_labels(tmp_path):
 
     labels = load_manual_labels(labels_path)
 
-    assert labels[("rag", "q1")].accuracy == "correct"
-    assert labels[("rag", "q1")].contradiction_detected is True
-    assert labels[("wiki", "q2")].compression_loss == "major"
+    assert labels[("rag", "q1", "phase_1")].accuracy == "correct"
+    assert labels[("rag", "q1", "phase_1")].contradiction_detected is True
+    assert labels[("wiki", "q2", "phase_2")].compression_loss == "major"
 
 
 def test_metric_aggregation_and_drift():
     labels_csv = "\n".join([
-        "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
-        "rag,q1,correct,full,correct,true,true,none,true,",
-        "rag,q2,wrong,failed,stale,false,false,major,false,",
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+        "rag,q1,phase_1,correct,full,correct,true,true,none,true,",
+        "rag,q2,phase_2,wrong,failed,stale,false,false,major,false,",
     ])
     from tempfile import NamedTemporaryFile
     with NamedTemporaryFile("w+", suffix=".csv") as tmp:
@@ -96,6 +96,7 @@ def test_report_file_generation(tmp_path):
             [
                 "query_id",
                 "system",
+                "phase",
                 "accuracy",
                 "synthesis",
                 "latest_state",
@@ -106,8 +107,8 @@ def test_report_file_generation(tmp_path):
                 "evaluator_notes",
             ]
         )
-        writer.writerow(["q1", "rag", "correct", "full", "correct", "true", "true", "none", "true", ""])
-        writer.writerow(["q2", "rag", "wrong", "failed", "stale", "false", "false", "major", "false", ""])
+        writer.writerow(["q1", "rag", "phase_1", "correct", "full", "correct", "true", "true", "none", "true", ""])
+        writer.writerow(["q2", "rag", "phase_2", "wrong", "failed", "stale", "false", "false", "major", "false", ""])
 
     records = merge_outputs_with_labels(_sample_outputs(), load_manual_labels(labels_path))
     output_dir = tmp_path / "report"
@@ -122,14 +123,14 @@ def test_report_file_generation(tmp_path):
     assert "summaries_by_system" in summary
 
 
-def test_merge_uses_system_plus_query_id_for_labels():
+def test_merge_uses_system_plus_query_id_plus_phase_for_labels():
     outputs = [
         RunOutputRecord(query_id="q1", system="rag", phase="phase_1", question="Q", category="policy", answer="A"),
         RunOutputRecord(query_id="q1", system="wiki", phase="phase_1", question="Q", category="policy", answer="A"),
     ]
     labels = {
-        ("rag", "q1"): load_manual_labels_from_row("rag", "q1", "correct"),
-        ("wiki", "q1"): load_manual_labels_from_row("wiki", "q1", "wrong"),
+        ("rag", "q1", "phase_1"): load_manual_labels_from_row("rag", "q1", "phase_1", "correct"),
+        ("wiki", "q1", "phase_1"): load_manual_labels_from_row("wiki", "q1", "phase_1", "wrong"),
     }
 
     records = merge_outputs_with_labels(outputs, labels)
@@ -138,15 +139,15 @@ def test_merge_uses_system_plus_query_id_for_labels():
     assert by_system["wiki"].accuracy == "wrong"
 
 
-def load_manual_labels_from_row(system: str, query_id: str, accuracy: str):
+def load_manual_labels_from_row(system: str, query_id: str, phase: str, accuracy: str):
     return load_manual_labels_from_text(
         "\n".join(
             [
-                "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
-                f"{system},{query_id},{accuracy},full,correct,true,true,none,true,",
+                "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                f"{system},{query_id},{phase},{accuracy},full,correct,true,true,none,true,",
             ]
         )
-    )[(system, query_id)]
+    )[(system, query_id, phase)]
 
 
 def load_manual_labels_from_text(csv_payload: str):
@@ -200,7 +201,7 @@ def test_report_generation_contains_run_traceability_fields(tmp_path):
             metadata={"artifact_dir": "artifacts/rag_runs/rag-1"},
         )
     ]
-    labels = {("rag", "q1"): load_manual_labels_from_row("rag", "q1", "correct")}
+    labels = {("rag", "q1", "phase_1"): load_manual_labels_from_row("rag", "q1", "phase_1", "correct")}
     output_dir = tmp_path / "report_traceability"
     write_reports(merge_outputs_with_labels(records, labels), output_dir)
 
@@ -215,8 +216,8 @@ def test_wildcard_labels_are_rejected(tmp_path):
     labels_path.write_text(
         "\n".join(
             [
-                "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
-                "*,q1,correct,full,correct,true,true,none,true,",
+                "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "*,q1,phase_1,correct,full,correct,true,true,none,true,",
             ]
         ),
         encoding="utf-8",
@@ -227,6 +228,42 @@ def test_wildcard_labels_are_rejected(tmp_path):
         assert "wildcard labels are not supported" in str(exc)
     else:
         raise AssertionError("Expected wildcard label rows to be rejected.")
+
+
+def test_same_query_id_across_phases_keeps_distinct_labels():
+    outputs = [
+        RunOutputRecord(query_id="q1", system="rag", phase="phase_1", question="Q", category="policy", answer="A1"),
+        RunOutputRecord(query_id="q1", system="rag", phase="phase_2", question="Q", category="policy", answer="A2"),
+    ]
+    labels = {
+        ("rag", "q1", "phase_1"): load_manual_labels_from_row("rag", "q1", "phase_1", "correct"),
+        ("rag", "q1", "phase_2"): load_manual_labels_from_row("rag", "q1", "phase_2", "wrong"),
+    }
+
+    records = merge_outputs_with_labels(outputs, labels)
+    by_phase = {record.phase: record for record in records}
+    assert by_phase["phase_1"].accuracy == "correct"
+    assert by_phase["phase_2"].accuracy == "wrong"
+
+
+def test_load_manual_labels_fails_when_phase_missing(tmp_path):
+    labels_path = tmp_path / "labels.csv"
+    labels_path.write_text(
+        "\n".join(
+            [
+                "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "rag,q1,correct,full,correct,true,true,none,true,",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        load_manual_labels(labels_path)
+    except ValueError as exc:
+        assert "must include a phase value" in str(exc)
+    else:
+        raise AssertionError("Expected labels without phase to fail.")
 
 
 def test_repeated_runs_within_same_second_have_distinct_run_ids():

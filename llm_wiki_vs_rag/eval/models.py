@@ -46,6 +46,7 @@ class ManualEvalLabel(BaseModel):
 
     query_id: str = Field(min_length=1)
     system: SystemLabel | None = None
+    phase: PhaseLabel
     accuracy: AccuracyLabel
     synthesis: SynthesisLabel
     latest_state: LatestStateLabel

@@ -30,9 +30,9 @@ def _to_bool(raw: str) -> bool:
     return raw.strip().lower() in {"1", "true", "t", "yes", "y"}
 
 
-def load_manual_labels(csv_path: Path) -> dict[tuple[str, str], ManualEvalLabel]:
-    """Load manual human labels from CSV keyed by (system, query_id)."""
-    labels: dict[tuple[str, str], ManualEvalLabel] = {}
+def load_manual_labels(csv_path: Path) -> dict[tuple[str, str, str], ManualEvalLabel]:
+    """Load manual human labels from CSV keyed by (system, query_id, phase)."""
+    labels: dict[tuple[str, str, str], ManualEvalLabel] = {}
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
@@ -41,9 +41,13 @@ def load_manual_labels(csv_path: Path) -> dict[tuple[str, str], ManualEvalLabel]
                 raise ValueError(
                     "Manual labels must specify an explicit system per row; wildcard labels are not supported."
                 )
+            phase = (row.get("phase") or "").strip()
+            if not phase:
+                raise ValueError("Manual labels must include a phase value for phase-based evaluation.")
             label = ManualEvalLabel(
                 query_id=row["query_id"],
                 system=(system or None),
+                phase=phase,
                 accuracy=row["accuracy"],
                 synthesis=row["synthesis"],
                 latest_state=row["latest_state"],
@@ -53,7 +57,7 @@ def load_manual_labels(csv_path: Path) -> dict[tuple[str, str], ManualEvalLabel]
                 provenance_fidelity=_to_bool(row["provenance_fidelity"]),
                 evaluator_notes=row.get("evaluator_notes", ""),
             )
-            labels[(label.system, label.query_id)] = label
+            labels[(label.system, label.query_id, label.phase)] = label
     return labels
 
 
@@ -117,12 +121,12 @@ def load_run_outputs(path: Path) -> list[RunOutputRecord]:
 
 def merge_outputs_with_labels(
     run_outputs: list[RunOutputRecord],
-    labels_by_system_query: dict[tuple[str, str], ManualEvalLabel],
+    labels_by_system_query_phase: dict[tuple[str, str, str], ManualEvalLabel],
 ) -> list[EvaluationRecord]:
     """Merge system outputs with manual labels into evaluation records."""
     records: list[EvaluationRecord] = []
     for output in run_outputs:
-        label = labels_by_system_query.get((output.system, output.query_id))
+        label = labels_by_system_query_phase.get((output.system, output.query_id, output.phase))
         records.append(
             EvaluationRecord(
                 query_id=output.query_id,

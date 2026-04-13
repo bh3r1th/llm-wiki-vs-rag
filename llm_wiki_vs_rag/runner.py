@@ -34,24 +34,14 @@ def _validate_benchmark_llm_config(config: AppConfig) -> None:
 
 
 def _validate_comparison_cohorts(rag_outputs, wiki_outputs) -> None:
-    rag_query_ids = {record.query_id for record in rag_outputs}
-    wiki_query_ids = {record.query_id for record in wiki_outputs}
-    if rag_query_ids != wiki_query_ids:
-        rag_only = sorted(rag_query_ids - wiki_query_ids)
-        wiki_only = sorted(wiki_query_ids - rag_query_ids)
+    rag_pairs = {(record.query_id, record.phase) for record in rag_outputs}
+    wiki_pairs = {(record.query_id, record.phase) for record in wiki_outputs}
+    if rag_pairs != wiki_pairs:
+        rag_only = sorted(rag_pairs - wiki_pairs)[:5]
+        wiki_only = sorted(wiki_pairs - rag_pairs)[:5]
         raise ValueError(
-            "Cannot compare systems with mismatched query_id cohorts. "
-            f"rag_only={rag_only}, wiki_only={wiki_only}."
-        )
-
-    rag_phases = {record.phase for record in rag_outputs}
-    wiki_phases = {record.phase for record in wiki_outputs}
-    if rag_phases != wiki_phases:
-        rag_only = sorted(rag_phases - wiki_phases)
-        wiki_only = sorted(wiki_phases - rag_phases)
-        raise ValueError(
-            "Cannot compare systems with mismatched phase cohorts. "
-            f"rag_only={rag_only}, wiki_only={wiki_only}."
+            "Cannot compare systems with mismatched (query_id, phase) cohorts. "
+            f"rag_only_sample={rag_only}, wiki_only_sample={wiki_only}."
         )
 
 
