@@ -59,6 +59,11 @@ def build_parser() -> argparse.ArgumentParser:
     label_template_parser.add_argument("--run-file", type=Path, required=True)
     label_template_parser.add_argument("--output-file", type=Path, required=True)
 
+    combined_label_template_parser = subparsers.add_parser("make-combined-label-template")
+    combined_label_template_parser.add_argument("--rag-run-file", type=Path, required=True)
+    combined_label_template_parser.add_argument("--wiki-run-file", type=Path, required=True)
+    combined_label_template_parser.add_argument("--output-file", type=Path, required=True)
+
     inspect_run_parser = subparsers.add_parser("inspect-run")
     inspect_run_parser.add_argument("--run-file", type=Path, required=True)
 

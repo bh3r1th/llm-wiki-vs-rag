@@ -183,3 +183,238 @@ def test_cli_parser_supports_make_label_template(tmp_path):
         ]
     )
     assert args.command == "make-label-template"
+
+
+def test_make_combined_label_template_row_count_matches_rag_plus_wiki(tmp_path):
+    rag_run_file = tmp_path / "rag_run.jsonl"
+    wiki_run_file = tmp_path / "wiki_run.jsonl"
+    output_file = tmp_path / "combined_labels.csv"
+    _write_run_jsonl(
+        rag_run_file,
+        [
+            {
+                "system": "rag",
+                "query_id": "q1",
+                "phase": "phase_1",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Rag Answer 1",
+                "metadata": {"corpus_snapshot": "snapshot-A", "execution_fingerprint": "fp-A"},
+            },
+            {
+                "system": "rag",
+                "query_id": "q1",
+                "phase": "phase_2",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Rag Answer 2",
+                "metadata": {"corpus_snapshot": "snapshot-B", "execution_fingerprint": "fp-B"},
+            },
+        ],
+    )
+    _write_run_jsonl(
+        wiki_run_file,
+        [
+            {
+                "system": "wiki",
+                "query_id": "q1",
+                "phase": "phase_1",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Wiki Answer 1",
+                "metadata": {"corpus_snapshot": "snapshot-A", "execution_fingerprint": "fp-C"},
+            },
+            {
+                "system": "wiki",
+                "query_id": "q1",
+                "phase": "phase_2",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Wiki Answer 2",
+                "metadata": {"corpus_snapshot": "snapshot-B", "execution_fingerprint": "fp-D"},
+            },
+        ],
+    )
+
+    run_command(
+        "make-combined-label-template",
+        AppConfig(project_root=tmp_path),
+        rag_run_file=str(rag_run_file),
+        wiki_run_file=str(wiki_run_file),
+        output_file=str(output_file),
+    )
+
+    with output_file.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 4
+
+
+def test_make_combined_label_template_rejects_mixed_system_input_file(tmp_path):
+    rag_run_file = tmp_path / "rag_run.jsonl"
+    wiki_run_file = tmp_path / "wiki_run.jsonl"
+    output_file = tmp_path / "combined_labels.csv"
+    _write_run_jsonl(
+        rag_run_file,
+        [
+            {
+                "system": "rag",
+                "query_id": "q1",
+                "phase": "phase_1",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Rag Answer 1",
+                "metadata": {"corpus_snapshot": "snapshot-A", "execution_fingerprint": "fp-A"},
+            },
+            {
+                "system": "wiki",
+                "query_id": "q1",
+                "phase": "phase_2",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Wrong system in rag file",
+                "metadata": {"corpus_snapshot": "snapshot-B", "execution_fingerprint": "fp-B"},
+            },
+        ],
+    )
+    _write_run_jsonl(
+        wiki_run_file,
+        [
+            {
+                "system": "wiki",
+                "query_id": "q1",
+                "phase": "phase_1",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Wiki Answer 1",
+                "metadata": {"corpus_snapshot": "snapshot-A", "execution_fingerprint": "fp-C"},
+            },
+            {
+                "system": "wiki",
+                "query_id": "q1",
+                "phase": "phase_2",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Wiki Answer 2",
+                "metadata": {"corpus_snapshot": "snapshot-B", "execution_fingerprint": "fp-D"},
+            },
+        ],
+    )
+
+    try:
+        run_command(
+            "make-combined-label-template",
+            AppConfig(project_root=tmp_path),
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            output_file=str(output_file),
+        )
+    except ValueError as exc:
+        assert "System purity violation" in str(exc)
+    else:
+        raise AssertionError("Expected mixed-system input file to be rejected.")
+
+
+def test_make_combined_label_template_rejects_duplicate_identity_rows(tmp_path):
+    rag_run_file = tmp_path / "rag_run.jsonl"
+    wiki_run_file = tmp_path / "wiki_run.jsonl"
+    output_file = tmp_path / "combined_labels.csv"
+    duplicate = {
+        "system": "rag",
+        "query_id": "q1",
+        "phase": "phase_1",
+        "category": "lookup",
+        "question": "Question 1",
+        "answer": "Rag Answer 1",
+        "metadata": {"corpus_snapshot": "snapshot-A", "execution_fingerprint": "fp-A"},
+    }
+    _write_run_jsonl(rag_run_file, [duplicate, duplicate])
+    _write_run_jsonl(
+        wiki_run_file,
+        [
+            {
+                "system": "wiki",
+                "query_id": "q1",
+                "phase": "phase_1",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Wiki Answer 1",
+                "metadata": {"corpus_snapshot": "snapshot-A", "execution_fingerprint": "fp-B"},
+            }
+        ],
+    )
+
+    try:
+        run_command(
+            "make-combined-label-template",
+            AppConfig(project_root=tmp_path),
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            output_file=str(output_file),
+        )
+    except ValueError as exc:
+        assert "unique run output rows per (system, query_id, phase)" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate identity rows to be rejected.")
+
+
+def test_make_combined_label_template_fails_when_required_metadata_missing(tmp_path):
+    rag_run_file = tmp_path / "rag_run.jsonl"
+    wiki_run_file = tmp_path / "wiki_run.jsonl"
+    output_file = tmp_path / "combined_labels.csv"
+    _write_run_jsonl(
+        rag_run_file,
+        [
+            {
+                "system": "rag",
+                "query_id": "q1",
+                "phase": "phase_1",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Rag Answer 1",
+                "metadata": {"execution_fingerprint": "fp-A"},
+            }
+        ],
+    )
+    _write_run_jsonl(
+        wiki_run_file,
+        [
+            {
+                "system": "wiki",
+                "query_id": "q1",
+                "phase": "phase_1",
+                "category": "lookup",
+                "question": "Question 1",
+                "answer": "Wiki Answer 1",
+                "metadata": {"corpus_snapshot": "snapshot-A", "execution_fingerprint": "fp-B"},
+            }
+        ],
+    )
+
+    try:
+        run_command(
+            "make-combined-label-template",
+            AppConfig(project_root=tmp_path),
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            output_file=str(output_file),
+        )
+    except ValueError as exc:
+        assert "metadata.corpus_snapshot" in str(exc)
+    else:
+        raise AssertionError("Expected missing required metadata to fail template generation.")
+
+
+def test_cli_parser_supports_make_combined_label_template(tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "make-combined-label-template",
+            "--rag-run-file",
+            str(tmp_path / "rag_run.jsonl"),
+            "--wiki-run-file",
+            str(tmp_path / "wiki_run.jsonl"),
+            "--output-file",
+            str(tmp_path / "labels.csv"),
+        ]
+    )
+    assert args.command == "make-combined-label-template"

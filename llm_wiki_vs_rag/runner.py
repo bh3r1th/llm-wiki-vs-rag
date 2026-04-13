@@ -478,6 +478,31 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
             raise ValueError(f"Manual label template input must be JSONL (.jsonl). got={run_file.name}")
         run_outputs = load_run_outputs(run_file)
         write_manual_label_template_from_run_outputs(run_outputs=run_outputs, output_path=output_file)
+    elif command == "make-combined-label-template":
+        rag_run_file = Path(str(kwargs["rag_run_file"]))
+        wiki_run_file = Path(str(kwargs["wiki_run_file"]))
+        output_file = Path(str(kwargs["output_file"]))
+        if rag_run_file.suffix != ".jsonl":
+            raise ValueError(f"Combined manual label template RAG input must be JSONL (.jsonl). got={rag_run_file.name}")
+        if wiki_run_file.suffix != ".jsonl":
+            raise ValueError(f"Combined manual label template wiki input must be JSONL (.jsonl). got={wiki_run_file.name}")
+        rag_outputs = load_run_outputs(rag_run_file)
+        wiki_outputs = load_run_outputs(wiki_run_file)
+        _validate_system_purity(
+            rag_outputs,
+            expected_system="rag",
+            context=f"make-combined-label-template rag:{rag_run_file}",
+        )
+        _validate_system_purity(
+            wiki_outputs,
+            expected_system="wiki",
+            context=f"make-combined-label-template wiki:{wiki_run_file}",
+        )
+        _validate_comparison_cohorts(rag_outputs, wiki_outputs)
+        write_manual_label_template_from_run_outputs(
+            run_outputs=rag_outputs + wiki_outputs,
+            output_path=output_file,
+        )
     elif command == "inspect-run":
         run_file = Path(str(kwargs["run_file"]))
         _inspect_run_outputs(run_file)
