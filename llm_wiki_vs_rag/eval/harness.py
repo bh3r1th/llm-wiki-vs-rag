@@ -18,31 +18,21 @@ def resolve_corpus_snapshot_identity(paths: ProjectPaths, system: str) -> str:
     """Resolve a concrete corpus snapshot identifier for benchmark run outputs."""
     if system == "rag":
         manifest_path = paths.artifacts_dir / "rag_index" / "manifest.json"
-        if not manifest_path.exists():
-            return str(manifest_path.resolve())
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if isinstance(payload, dict):
-            snapshot_id = payload.get("snapshot_id") or payload.get("id") or payload.get("snapshot")
-            if snapshot_id:
-                return str(snapshot_id)
-        return str(manifest_path.resolve())
     elif system == "wiki":
-        base_path = paths.wiki_dir
-        manifest_candidates = [
-            paths.wiki_dir / "snapshot.json",
-            paths.wiki_dir / "manifest.json",
-        ]
+        manifest_path = paths.wiki_dir / "snapshot.json"
     else:
         raise ValueError(f"Unsupported system for snapshot resolution: {system}")
 
-    for manifest_path in manifest_candidates:
-        if manifest_path.exists():
-            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-            if isinstance(payload, dict):
-                snapshot_id = payload.get("snapshot_id") or payload.get("id") or payload.get("snapshot")
-                if snapshot_id:
-                    return str(snapshot_id)
-    return str(base_path.resolve())
+    if not manifest_path.exists():
+        raise ValueError(f"Missing canonical snapshot manifest for {system}: {manifest_path}")
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Invalid snapshot manifest payload for {system}: {manifest_path}")
+    snapshot_id = str(payload.get("snapshot_id", "")).strip()
+    if not snapshot_id:
+        raise ValueError(f"Missing snapshot_id in canonical snapshot manifest for {system}: {manifest_path}")
+    return snapshot_id
 
 
 def load_query_cases(path: Path) -> list[EvalQueryCase]:

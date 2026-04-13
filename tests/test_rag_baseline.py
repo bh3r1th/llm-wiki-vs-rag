@@ -12,7 +12,7 @@ from llm_wiki_vs_rag.models import DocumentBatch, QueryCase, RetrievedChunk, Sou
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.rag.chunking import chunk_document
 from llm_wiki_vs_rag.rag.indexing import RAGIndex, _embed_text, build_in_memory_index, persist_index
-from llm_wiki_vs_rag.rag.pipeline import answer_rag_query
+from llm_wiki_vs_rag.rag.pipeline import answer_rag_query, build_rag_index
 from llm_wiki_vs_rag.rag.retrieve import retrieve_top_k
 
 
@@ -112,7 +112,7 @@ def test_pipeline_saves_query_artifacts(tmp_path):
     config = AppConfig(project_root=tmp_path)
     batch = DocumentBatch(documents=[SourceDocument(doc_id="001_doc", source_path=raw_doc, text=raw_doc.read_text())])
     index = build_in_memory_index(batch=batch, chunk_size_chars=20, chunk_overlap_chars=5)
-    persist_index(index=index, artifacts_dir=paths.artifacts_dir)
+    persist_index(index=index, artifacts_dir=paths.artifacts_dir, snapshot_id="sha256:test")
 
     result = answer_rag_query(config=config, paths=paths, query=QueryCase(query_id="q1", question="alpha?"))
     assert result.query_id == "q1"
@@ -128,3 +128,15 @@ def test_pipeline_saves_query_artifacts(tmp_path):
 
     metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["query_id"] == "q1"
+
+
+def test_build_rag_index_writes_canonical_snapshot_identity(tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
+    (paths.raw_dir / "002_doc.txt").write_text("beta", encoding="utf-8")
+
+    build_rag_index(config=AppConfig(project_root=tmp_path), paths=paths)
+
+    manifest = json.loads((paths.artifacts_dir / "rag_index" / "manifest.json").read_text(encoding="utf-8"))
+    assert str(manifest["snapshot_id"]).startswith("sha256:")

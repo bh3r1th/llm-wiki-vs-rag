@@ -8,7 +8,7 @@ from llm_wiki_vs_rag.config import AppConfig, BenchmarkConfig, LLMConfig, RAGCon
 from llm_wiki_vs_rag.models import QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.rag.pipeline import answer_rag_query
-from llm_wiki_vs_rag.wiki.pipeline import run_wiki_queries
+from llm_wiki_vs_rag.wiki.pipeline import ingest_wiki, run_wiki_queries
 from llm_wiki_vs_rag.wiki.prompting import build_wiki_query_prompt
 
 
@@ -77,3 +77,16 @@ def test_locked_benchmark_fails_fast_on_top_k_parity_break():
         assert "retrieval parity" in str(exc)
     else:
         raise AssertionError("Expected parity mismatch to fail fast in locked benchmark mode.")
+
+
+def test_wiki_ingest_writes_canonical_snapshot_identity(monkeypatch, tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.raw_dir / "001.txt").write_text("alpha", encoding="utf-8")
+    (paths.raw_dir / "002.txt").write_text("beta", encoding="utf-8")
+    monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.ingest_one_document", lambda **_kwargs: {"ok": True})
+
+    ingest_wiki(config=AppConfig(project_root=tmp_path), paths=paths)
+
+    payload = (paths.wiki_dir / "snapshot.json").read_text(encoding="utf-8")
+    assert '"snapshot_id": "sha256:' in payload

@@ -45,6 +45,31 @@ def _validate_comparison_cohorts(rag_outputs, wiki_outputs) -> None:
         )
 
 
+def _validate_comparison_queryset_equivalence(rag_outputs, wiki_outputs) -> None:
+    rag_by_pair = {(record.query_id, record.phase): record for record in rag_outputs}
+    wiki_by_pair = {(record.query_id, record.phase): record for record in wiki_outputs}
+    mismatches: list[dict[str, str]] = []
+    for pair in sorted(rag_by_pair):
+        rag_record = rag_by_pair[pair]
+        wiki_record = wiki_by_pair[pair]
+        if rag_record.question != wiki_record.question or rag_record.category != wiki_record.category:
+            mismatches.append(
+                {
+                    "query_id": rag_record.query_id,
+                    "phase": rag_record.phase,
+                    "rag_question": rag_record.question,
+                    "wiki_question": wiki_record.question,
+                    "rag_category": rag_record.category,
+                    "wiki_category": wiki_record.category,
+                }
+            )
+    if mismatches:
+        raise ValueError(
+            "Cannot compare systems when matched (query_id, phase) rows differ in question/category "
+            f"content. mismatch_sample={mismatches[:5]}."
+        )
+
+
 def _validate_system_uniqueness(outputs, system_name: str) -> None:
     counts: dict[tuple[str, str], int] = {}
     for record in outputs:
@@ -135,6 +160,7 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         _validate_system_uniqueness(rag_outputs, "rag")
         _validate_system_uniqueness(wiki_outputs, "wiki")
         _validate_comparison_cohorts(rag_outputs, wiki_outputs)
+        _validate_comparison_queryset_equivalence(rag_outputs, wiki_outputs)
         outputs = rag_outputs + wiki_outputs
         labels = load_manual_labels(labels_file)
         records = merge_outputs_with_labels(outputs, labels)
