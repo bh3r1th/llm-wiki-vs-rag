@@ -33,15 +33,85 @@ def _resolve_corpus_snapshot_manifest(paths: ProjectPaths, system: str) -> dict:
 
 
 def load_query_cases(path: Path) -> list[EvalQueryCase]:
-    """Load evaluation query cases from JSON or JSONL."""
-    if path.suffix == ".jsonl":
-        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        return [EvalQueryCase.model_validate(json.loads(line)) for line in lines]
+    """Load evaluation query cases from canonical benchmark JSONL and enforce cohort invariants."""
+    if path.suffix != ".jsonl":
+        raise ValueError(
+            f"Benchmark query files must be JSONL (.jsonl). got={path.name}"
+        )
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if isinstance(payload, dict):
-        payload = payload.get("queries", [])
-    return [EvalQueryCase.model_validate(item) for item in payload]
+    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    query_cases = [EvalQueryCase.model_validate(json.loads(line)) for line in lines]
+    validate_benchmark_query_contract(query_cases=query_cases, source=str(path))
+    return query_cases
+
+
+def validate_benchmark_query_contract(query_cases: list[EvalQueryCase], source: str = "<memory>") -> None:
+    """Validate strict benchmark query contract invariants."""
+    allowed_categories = {"lookup", "synthesis", "latest_state", "contradiction"}
+    invalid_categories = sorted(
+        {
+            case.category
+            for case in query_cases
+            if case.category not in allowed_categories
+        }
+    )
+    if invalid_categories:
+        raise ValueError(
+            "Benchmark query categories must be one of "
+            f"{sorted(allowed_categories)}. source={source}, invalid_categories={invalid_categories}."
+        )
+
+    counts: dict[tuple[str, str], int] = {}
+    for case in query_cases:
+        key = (case.query_id, case.phase)
+        counts[key] = counts.get(key, 0) + 1
+    duplicates = sorted(
+        {"query_id": query_id, "phase": phase, "count": count}
+        for (query_id, phase), count in counts.items()
+        if count > 1
+    )
+    if duplicates:
+        raise ValueError(
+            "Benchmark query rows must be unique per (query_id, phase). "
+            f"source={source}, duplicate_sample={duplicates[:5]}."
+        )
+
+    phase_1_by_query = {case.query_id: case for case in query_cases if case.phase == "phase_1"}
+    phase_2_by_query = {case.query_id: case for case in query_cases if case.phase == "phase_2"}
+    phase_1_ids = set(phase_1_by_query)
+    phase_2_ids = set(phase_2_by_query)
+
+    missing_in_phase_2 = sorted(phase_1_ids - phase_2_ids)
+    extra_in_phase_2 = sorted(phase_2_ids - phase_1_ids)
+    if missing_in_phase_2 or extra_in_phase_2:
+        raise ValueError(
+            "Benchmark query set must contain the same query_id cohort across phase_1 and phase_2. "
+            f"source={source}, missing_in_phase_2_sample={missing_in_phase_2[:5]}, "
+            f"extra_in_phase_2_sample={extra_in_phase_2[:5]}."
+        )
+
+    mismatched_content: list[dict[str, str]] = []
+    for query_id in sorted(phase_1_ids):
+        phase_1_case = phase_1_by_query[query_id]
+        phase_2_case = phase_2_by_query[query_id]
+        if (
+            phase_1_case.question != phase_2_case.question
+            or phase_1_case.category != phase_2_case.category
+        ):
+            mismatched_content.append(
+                {
+                    "query_id": query_id,
+                    "phase_1_question": phase_1_case.question,
+                    "phase_2_question": phase_2_case.question,
+                    "phase_1_category": phase_1_case.category,
+                    "phase_2_category": phase_2_case.category,
+                }
+            )
+    if mismatched_content:
+        raise ValueError(
+            "Benchmark query rows must keep question/category stable across phase_1 and phase_2 for each query_id. "
+            f"source={source}, mismatch_sample={mismatched_content[:5]}."
+        )
 
 
 def _to_bool(raw: str) -> bool:

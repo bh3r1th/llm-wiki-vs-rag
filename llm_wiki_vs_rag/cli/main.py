@@ -23,6 +23,9 @@ def build_parser() -> argparse.ArgumentParser:
         run_parser.add_argument("--phase", choices=("phase_1", "phase_2"), required=True)
         run_parser.add_argument("--output-file", type=Path)
 
+    validate_queries_parser = subparsers.add_parser("validate-queries")
+    validate_queries_parser.add_argument("--query-file", type=Path, required=True)
+
     for eval_command_name in ("evaluate-rag", "evaluate-wiki"):
         eval_parser = subparsers.add_parser(eval_command_name)
         eval_parser.add_argument("--run-file", type=Path, required=True)
