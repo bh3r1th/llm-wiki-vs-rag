@@ -45,6 +45,10 @@ def build_parser() -> argparse.ArgumentParser:
     freeze_parser = subparsers.add_parser("freeze-corpus")
     freeze_parser.add_argument("--dataset-root", type=Path, required=True)
 
+    switch_parser = subparsers.add_parser("switch-phase-corpus")
+    switch_parser.add_argument("--phase", choices=("phase_1", "phase_2"), required=True)
+    switch_parser.add_argument("--source-root", type=Path)
+
     compare_parser = subparsers.add_parser("compare-systems")
     compare_parser.add_argument("--rag-run-file", type=Path, required=True)
     compare_parser.add_argument("--wiki-run-file", type=Path, required=True)
