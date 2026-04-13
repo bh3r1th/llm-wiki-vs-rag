@@ -77,10 +77,12 @@ def _write_per_query_csv(records: list[EvaluationRecord], output_path: Path) -> 
             fieldnames=[
                 "query_id",
                 "system",
+                "run_id",
                 "phase",
                 "category",
                 "question",
                 "answer",
+                "artifact_dir",
                 "latency_ms",
                 "total_tokens",
                 "accuracy",
@@ -95,7 +97,28 @@ def _write_per_query_csv(records: list[EvaluationRecord], output_path: Path) -> 
         )
         writer.writeheader()
         for record in records:
-            writer.writerow(record.model_dump())
+            writer.writerow(
+                {
+                    "query_id": record.query_id,
+                    "system": record.system,
+                    "run_id": record.run_id or "",
+                    "phase": record.phase,
+                    "category": record.category,
+                    "question": record.question,
+                    "answer": record.answer,
+                    "artifact_dir": str(record.metadata.get("artifact_dir", "")),
+                    "latency_ms": "" if record.latency_ms is None else record.latency_ms,
+                    "total_tokens": "" if record.total_tokens is None else record.total_tokens,
+                    "accuracy": record.accuracy or "",
+                    "synthesis": record.synthesis or "",
+                    "latest_state": record.latest_state or "",
+                    "contradiction_detected": record.contradiction_detected,
+                    "contradiction_resolved": record.contradiction_resolved,
+                    "compression_loss": record.compression_loss or "",
+                    "provenance_fidelity": record.provenance_fidelity,
+                    "evaluator_notes": record.evaluator_notes,
+                }
+            )
 
 
 def _render_markdown_report(comparison: ComparisonReport) -> str:

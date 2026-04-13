@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from time import perf_counter
 
 from llm_wiki_vs_rag.config import AppConfig
 from llm_wiki_vs_rag.data.load_docs import load_source_documents
@@ -43,6 +44,7 @@ def run_wiki_queries(
 
     results: list[GenerationResult] = []
     for query in query_cases:
+        start = perf_counter()
         selected_pages = retrieve_wiki_pages(pages=pages, query=query.question, top_k=3)
 
         if use_rag_fallback and not selected_pages:
@@ -81,6 +83,9 @@ def run_wiki_queries(
                 answer=answer,
                 mode="wiki",
                 used_context_ids=[page.slug for page in selected_pages],
+                run_id=run_id,
+                latency_ms=round((perf_counter() - start) * 1000.0, 3),
+                artifact_dir=str(run_dir),
             )
         )
     return results

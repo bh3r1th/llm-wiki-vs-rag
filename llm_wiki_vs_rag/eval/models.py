@@ -45,6 +45,7 @@ class ManualEvalLabel(BaseModel):
     """Human-entered labels for one query response."""
 
     query_id: str = Field(min_length=1)
+    system: SystemLabel | None = None
     accuracy: AccuracyLabel
     synthesis: SynthesisLabel
     latest_state: LatestStateLabel

@@ -5,7 +5,6 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from time import perf_counter
 
 from llm_wiki_vs_rag.config import AppConfig
 from llm_wiki_vs_rag.eval.models import EvalQueryCase, EvaluationRecord, ManualEvalLabel, RunOutputRecord
@@ -31,14 +30,16 @@ def _to_bool(raw: str) -> bool:
     return raw.strip().lower() in {"1", "true", "t", "yes", "y"}
 
 
-def load_manual_labels(csv_path: Path) -> dict[str, ManualEvalLabel]:
-    """Load manual human labels from CSV keyed by query_id."""
-    labels: dict[str, ManualEvalLabel] = {}
+def load_manual_labels(csv_path: Path) -> dict[tuple[str, str], ManualEvalLabel]:
+    """Load manual human labels from CSV keyed by (system, query_id)."""
+    labels: dict[tuple[str, str], ManualEvalLabel] = {}
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
+            system = (row.get("system") or "").strip()
             label = ManualEvalLabel(
                 query_id=row["query_id"],
+                system=(system or None),
                 accuracy=row["accuracy"],
                 synthesis=row["synthesis"],
                 latest_state=row["latest_state"],
@@ -48,7 +49,8 @@ def load_manual_labels(csv_path: Path) -> dict[str, ManualEvalLabel]:
                 provenance_fidelity=_to_bool(row["provenance_fidelity"]),
                 evaluator_notes=row.get("evaluator_notes", ""),
             )
-            labels[label.query_id] = label
+            label_system = label.system or "*"
+            labels[(label_system, label.query_id)] = label
     return labels
 
 
@@ -61,17 +63,14 @@ def run_queries_for_system(
     """Run one system over a query set and normalize outputs."""
     query_inputs = [QueryCase(query_id=case.query_id, question=case.question) for case in query_cases]
 
-    start = perf_counter()
     if system == "rag":
         results = run_rag_queries(config=config, paths=paths, query_cases=query_inputs)
     elif system == "wiki":
         results = run_wiki_queries(config=config, paths=paths, query_cases=query_inputs)
     else:
         raise ValueError(f"Unsupported system: {system}")
-    elapsed_ms = (perf_counter() - start) * 1000.0
 
     by_query = {item.query_id: item for item in query_cases}
-    per_query_latency = elapsed_ms / len(results) if results else 0.0
 
     normalized: list[RunOutputRecord] = []
     for result in results:
@@ -84,9 +83,12 @@ def run_queries_for_system(
                 question=case.question,
                 category=case.category,
                 answer=result.answer,
-                run_id=None,
-                latency_ms=round(per_query_latency, 3),
-                metadata={"used_context_ids": result.used_context_ids},
+                run_id=result.run_id,
+                latency_ms=result.latency_ms,
+                metadata={
+                    "used_context_ids": result.used_context_ids,
+                    "artifact_dir": result.artifact_dir,
+                },
             )
         )
     return normalized
@@ -112,12 +114,14 @@ def load_run_outputs(path: Path) -> list[RunOutputRecord]:
 
 def merge_outputs_with_labels(
     run_outputs: list[RunOutputRecord],
-    labels_by_query_id: dict[str, ManualEvalLabel],
+    labels_by_system_query: dict[tuple[str, str], ManualEvalLabel],
 ) -> list[EvaluationRecord]:
     """Merge system outputs with manual labels into evaluation records."""
     records: list[EvaluationRecord] = []
     for output in run_outputs:
-        label = labels_by_query_id.get(output.query_id)
+        label = labels_by_system_query.get((output.system, output.query_id))
+        if label is None:
+            label = labels_by_system_query.get(("*", output.query_id))
         records.append(
             EvaluationRecord(
                 query_id=output.query_id,
