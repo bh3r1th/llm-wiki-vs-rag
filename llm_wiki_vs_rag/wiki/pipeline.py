@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from time import perf_counter
+from uuid import uuid4
 
 from llm_wiki_vs_rag.config import AppConfig
 from llm_wiki_vs_rag.data.load_docs import load_source_documents
@@ -19,7 +20,8 @@ from llm_wiki_vs_rag.wiki.retrieve import retrieve_wiki_pages
 
 
 def _new_run_id(query_id: str) -> str:
-    return f"{query_id}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    return f"{query_id}-{timestamp}-{uuid4().hex[:8]}"
 
 
 def ingest_wiki(config: AppConfig, paths: ProjectPaths):

@@ -88,3 +88,107 @@ def test_cli_output_args_are_optional_and_runner_defaults_are_used(monkeypatch, 
     run_command("run-rag-queries", config, query_file=str(query_file))
 
     assert captured["output_path"] == tmp_path / "artifacts" / "run-rag-queries.jsonl"
+
+
+def test_compare_systems_fails_on_mismatched_query_cohorts(tmp_path):
+    rag_run_file = tmp_path / "rag.jsonl"
+    rag_run_file.write_text(
+        json.dumps(
+            {
+                "query_id": "q1",
+                "system": "rag",
+                "phase": "phase_1",
+                "question": "Q1",
+                "category": "policy",
+                "answer": "A1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    wiki_run_file = tmp_path / "wiki.jsonl"
+    wiki_run_file.write_text(
+        json.dumps(
+            {
+                "query_id": "q2",
+                "system": "wiki",
+                "phase": "phase_1",
+                "question": "Q2",
+                "category": "policy",
+                "answer": "A2",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+
+    config = AppConfig(project_root=tmp_path)
+    try:
+        run_command(
+            "compare-systems",
+            config,
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+        )
+    except ValueError as exc:
+        assert "mismatched query_id cohorts" in str(exc)
+    else:
+        raise AssertionError("Expected compare-systems to fail when query cohorts differ.")
+
+
+def test_compare_systems_fails_on_mismatched_phase_cohorts(tmp_path):
+    rag_run_file = tmp_path / "rag.jsonl"
+    rag_run_file.write_text(
+        json.dumps(
+            {
+                "query_id": "q1",
+                "system": "rag",
+                "phase": "phase_1",
+                "question": "Q1",
+                "category": "policy",
+                "answer": "A1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    wiki_run_file = tmp_path / "wiki.jsonl"
+    wiki_run_file.write_text(
+        json.dumps(
+            {
+                "query_id": "q1",
+                "system": "wiki",
+                "phase": "phase_2",
+                "question": "Q1",
+                "category": "policy",
+                "answer": "A1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+
+    config = AppConfig(project_root=tmp_path)
+    try:
+        run_command(
+            "compare-systems",
+            config,
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+        )
+    except ValueError as exc:
+        assert "mismatched phase cohorts" in str(exc)
+    else:
+        raise AssertionError("Expected compare-systems to fail when phase cohorts differ.")

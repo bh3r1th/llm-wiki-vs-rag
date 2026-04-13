@@ -33,6 +33,28 @@ def _validate_benchmark_llm_config(config: AppConfig) -> None:
         raise ValueError("Missing LLM configuration for benchmark commands: llm.model_name is required.")
 
 
+def _validate_comparison_cohorts(rag_outputs, wiki_outputs) -> None:
+    rag_query_ids = {record.query_id for record in rag_outputs}
+    wiki_query_ids = {record.query_id for record in wiki_outputs}
+    if rag_query_ids != wiki_query_ids:
+        rag_only = sorted(rag_query_ids - wiki_query_ids)
+        wiki_only = sorted(wiki_query_ids - rag_query_ids)
+        raise ValueError(
+            "Cannot compare systems with mismatched query_id cohorts. "
+            f"rag_only={rag_only}, wiki_only={wiki_only}."
+        )
+
+    rag_phases = {record.phase for record in rag_outputs}
+    wiki_phases = {record.phase for record in wiki_outputs}
+    if rag_phases != wiki_phases:
+        rag_only = sorted(rag_phases - wiki_phases)
+        wiki_only = sorted(wiki_phases - rag_phases)
+        raise ValueError(
+            "Cannot compare systems with mismatched phase cohorts. "
+            f"rag_only={rag_only}, wiki_only={wiki_only}."
+        )
+
+
 def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     """Dispatch supported runner commands to pipeline entry points."""
     paths = ProjectPaths(config.project_root)
@@ -45,8 +67,7 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
             _validate_benchmark_llm_config(config)
         ingest_wiki(config=config, paths=paths)
     elif command in {"run-rag-queries", "run-wiki-queries"}:
-        if config.benchmark.locked:
-            _validate_benchmark_llm_config(config)
+        _validate_benchmark_llm_config(config)
         query_file = Path(str(kwargs["query_file"]))
         output_file = Path(str(kwargs.get("output_file") or paths.artifacts_dir / f"{command}.jsonl"))
         query_cases = load_query_cases(query_file)
@@ -65,7 +86,10 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         wiki_run_file = Path(str(kwargs["wiki_run_file"]))
         labels_file = Path(str(kwargs["labels_file"]))
         output_dir = Path(str(kwargs.get("output_dir") or paths.artifacts_dir / "compare-systems"))
-        outputs = load_run_outputs(rag_run_file) + load_run_outputs(wiki_run_file)
+        rag_outputs = load_run_outputs(rag_run_file)
+        wiki_outputs = load_run_outputs(wiki_run_file)
+        _validate_comparison_cohorts(rag_outputs, wiki_outputs)
+        outputs = rag_outputs + wiki_outputs
         labels = load_manual_labels(labels_file)
         records = merge_outputs_with_labels(outputs, labels)
         write_reports(records=records, output_dir=output_dir)
