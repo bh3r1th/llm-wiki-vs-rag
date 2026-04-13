@@ -26,6 +26,16 @@ def build_parser() -> argparse.ArgumentParser:
     validate_queries_parser = subparsers.add_parser("validate-queries")
     validate_queries_parser.add_argument("--query-file", type=Path, required=True)
 
+    smoke_parser = subparsers.add_parser("smoke-queries")
+    smoke_parser.add_argument("--query-file", type=Path, required=True)
+    smoke_parser.add_argument("--output-file", type=Path)
+
+    phase_run_parser = subparsers.add_parser("benchmark-phase-run")
+    phase_run_parser.add_argument("--system", choices=("rag", "wiki"), required=True)
+    phase_run_parser.add_argument("--phase", choices=("phase_1", "phase_2"), required=True)
+    phase_run_parser.add_argument("--query-file", type=Path, required=True)
+    phase_run_parser.add_argument("--output-file", type=Path)
+
     for eval_command_name in ("evaluate-rag", "evaluate-wiki"):
         eval_parser = subparsers.add_parser(eval_command_name)
         eval_parser.add_argument("--run-file", type=Path, required=True)

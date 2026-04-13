@@ -45,6 +45,71 @@ def load_query_cases(path: Path) -> list[EvalQueryCase]:
     return query_cases
 
 
+def load_phase_query_cases(path: Path, target_phase: str) -> list[EvalQueryCase]:
+    """Load phase-specific benchmark query cases from JSONL."""
+    if path.suffix != ".jsonl":
+        raise ValueError(
+            f"Benchmark query files must be JSONL (.jsonl). got={path.name}"
+        )
+    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    query_cases = [EvalQueryCase.model_validate(json.loads(line)) for line in lines]
+    if not query_cases:
+        raise ValueError("No query rows found in phase query file.")
+    allowed_categories = {"lookup", "synthesis", "latest_state", "contradiction"}
+    invalid_categories = sorted({case.category for case in query_cases if case.category not in allowed_categories})
+    if invalid_categories:
+        raise ValueError(
+            "Benchmark query categories must be one of "
+            f"{sorted(allowed_categories)}. source={path}, invalid_categories={invalid_categories}."
+        )
+    mismatched = [case for case in query_cases if case.phase != target_phase]
+    if mismatched:
+        raise ValueError(
+            "Phase-targeted benchmark execution requires all query rows to match the requested phase. "
+            f"target_phase={target_phase}, mismatch_sample="
+            f"{[{'query_id': case.query_id, 'phase': case.phase} for case in mismatched[:5]]}."
+        )
+    counts: dict[str, int] = {}
+    for case in query_cases:
+        counts[case.query_id] = counts.get(case.query_id, 0) + 1
+    duplicate_query_ids = sorted(query_id for query_id, count in counts.items() if count > 1)
+    if duplicate_query_ids:
+        raise ValueError(
+            "Phase-targeted benchmark query rows must be unique per query_id. "
+            f"source={path}, duplicate_query_id_sample={duplicate_query_ids[:5]}."
+        )
+    return query_cases
+
+
+def build_smoke_query_subset(
+    query_cases: list[EvalQueryCase],
+    per_category: dict[str, int] | None = None,
+) -> list[EvalQueryCase]:
+    """Select a small per-category subset while preserving both phases per query_id."""
+    validate_benchmark_query_contract(query_cases=query_cases, source="<smoke_subset_input>")
+    target_counts = per_category or {
+        "lookup": 2,
+        "synthesis": 2,
+        "latest_state": 2,
+        "contradiction": 2,
+    }
+    phase_1_rows = [case for case in query_cases if case.phase == "phase_1"]
+    selected_query_ids: set[str] = set()
+    for category, count in target_counts.items():
+        category_ids = [case.query_id for case in phase_1_rows if case.category == category]
+        selected_query_ids.update(category_ids[:count])
+    return [case for case in query_cases if case.query_id in selected_query_ids]
+
+
+def save_query_cases(query_cases: list[EvalQueryCase], output_path: Path) -> None:
+    """Save validated query cases as JSONL."""
+    validate_benchmark_query_contract(query_cases=query_cases, source=str(output_path))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as handle:
+        for case in query_cases:
+            handle.write(json.dumps(case.model_dump(mode="json")) + "\n")
+
+
 def validate_benchmark_query_contract(query_cases: list[EvalQueryCase], source: str = "<memory>") -> None:
     """Validate strict benchmark query contract invariants."""
     allowed_categories = {"lookup", "synthesis", "latest_state", "contradiction"}
@@ -371,6 +436,68 @@ def run_queries_for_system(
             f"system={system}, missing_identity_sample={sorted(missing_output_identities)[:5]}"
         )
     return normalized
+
+
+def _run_phase_queries_for_system(
+    *,
+    config: AppConfig,
+    paths: ProjectPaths,
+    query_cases: list[EvalQueryCase],
+    system: str,
+    phase: str,
+) -> list[RunOutputRecord]:
+    validate_benchmark_query_contract(query_cases=query_cases, source=f"<{system}:{phase}>")
+    return run_queries_for_system(
+        config=config,
+        paths=paths,
+        query_cases=query_cases,
+        system=system,
+        target_phase=phase,
+    )
+
+
+def run_phase_1_rag_queries(
+    *,
+    config: AppConfig,
+    paths: ProjectPaths,
+    query_cases: list[EvalQueryCase],
+) -> list[RunOutputRecord]:
+    return _run_phase_queries_for_system(
+        config=config, paths=paths, query_cases=query_cases, system="rag", phase="phase_1"
+    )
+
+
+def run_phase_1_wiki_queries(
+    *,
+    config: AppConfig,
+    paths: ProjectPaths,
+    query_cases: list[EvalQueryCase],
+) -> list[RunOutputRecord]:
+    return _run_phase_queries_for_system(
+        config=config, paths=paths, query_cases=query_cases, system="wiki", phase="phase_1"
+    )
+
+
+def run_phase_2_rag_queries(
+    *,
+    config: AppConfig,
+    paths: ProjectPaths,
+    query_cases: list[EvalQueryCase],
+) -> list[RunOutputRecord]:
+    return _run_phase_queries_for_system(
+        config=config, paths=paths, query_cases=query_cases, system="rag", phase="phase_2"
+    )
+
+
+def run_phase_2_wiki_queries(
+    *,
+    config: AppConfig,
+    paths: ProjectPaths,
+    query_cases: list[EvalQueryCase],
+) -> list[RunOutputRecord]:
+    return _run_phase_queries_for_system(
+        config=config, paths=paths, query_cases=query_cases, system="wiki", phase="phase_2"
+    )
 
 
 def save_run_outputs(records: list[RunOutputRecord], output_path: Path) -> None:
