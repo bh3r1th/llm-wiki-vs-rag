@@ -23,6 +23,7 @@ from llm_wiki_vs_rag.eval.harness import (
 )
 from llm_wiki_vs_rag.eval.report import write_reports
 from llm_wiki_vs_rag.data.corpus_freeze import write_corpus_manifest
+from llm_wiki_vs_rag.data.raw_snapshot_switch import switch_phase_corpus
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.rag.pipeline import build_rag_index
 from llm_wiki_vs_rag.wiki.pipeline import ingest_wiki
@@ -346,6 +347,10 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     elif command == "freeze-corpus":
         dataset_root = Path(str(kwargs["dataset_root"]))
         write_corpus_manifest(dataset_root=dataset_root, output_dir=paths.project_root / "data")
+    elif command == "switch-phase-corpus":
+        phase = str(kwargs["phase"])
+        source_root = Path(str(kwargs["source_root"])) if kwargs.get("source_root") is not None else None
+        switch_phase_corpus(paths=paths, phase=phase, source_root=source_root)
     elif command == "compare-systems":
         rag_run_file = Path(str(kwargs["rag_run_file"]))
         wiki_run_file = Path(str(kwargs["wiki_run_file"]))
