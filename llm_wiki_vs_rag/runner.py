@@ -85,7 +85,10 @@ def _validate_phase_snapshot_integrity(outputs, context: str) -> None:
     phase_rows = [record for record in outputs if record.phase in {"phase_1", "phase_2"}]
     phases_present = {record.phase for record in phase_rows}
     if not {"phase_1", "phase_2"}.issubset(phases_present):
-        return
+        raise ValueError(
+            "Phase benchmark/drift comparison requires both phase_1 and phase_2 rows in "
+            f"{context}, found={sorted(phases_present)}."
+        )
 
     by_phase: dict[str, set[str]] = {"phase_1": set(), "phase_2": set()}
     missing_snapshot_rows: list[tuple[str, str]] = []
@@ -142,6 +145,14 @@ def _validate_cross_system_phase_snapshot_parity(rag_outputs, wiki_outputs) -> N
             )
 
 
+def _validate_system_purity(outputs, expected_system: str, context: str) -> None:
+    invalid = sorted({record.system for record in outputs if record.system != expected_system})
+    if invalid:
+        raise ValueError(
+            f"System purity violation in {context}: expected only {expected_system}, found={invalid}."
+        )
+
+
 def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     """Dispatch supported runner commands to pipeline entry points."""
     paths = ProjectPaths(config.project_root)
@@ -165,6 +176,8 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         labels_file = Path(str(kwargs["labels_file"]))
         output_dir = Path(str(kwargs.get("output_dir") or paths.artifacts_dir / command))
         outputs = load_run_outputs(run_file)
+        expected_system = "rag" if command == "evaluate-rag" else "wiki"
+        _validate_system_purity(outputs, expected_system=expected_system, context=f"{command}:{run_file}")
         _validate_phase_snapshot_integrity(outputs, context=f"{command}:{run_file}")
         labels = load_manual_labels(labels_file)
         records = merge_outputs_with_labels(outputs, labels)
@@ -176,6 +189,8 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         output_dir = Path(str(kwargs.get("output_dir") or paths.artifacts_dir / "compare-systems"))
         rag_outputs = load_run_outputs(rag_run_file)
         wiki_outputs = load_run_outputs(wiki_run_file)
+        _validate_system_purity(rag_outputs, expected_system="rag", context=f"compare-systems rag:{rag_run_file}")
+        _validate_system_purity(wiki_outputs, expected_system="wiki", context=f"compare-systems wiki:{wiki_run_file}")
         _validate_phase_snapshot_integrity(rag_outputs, context=f"compare-systems rag:{rag_run_file}")
         _validate_phase_snapshot_integrity(wiki_outputs, context=f"compare-systems wiki:{wiki_run_file}")
         _validate_system_uniqueness(rag_outputs, "rag")

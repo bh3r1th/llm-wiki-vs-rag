@@ -33,14 +33,10 @@ def load_source_documents(raw_dir: Path) -> DocumentBatch:
 
 def fingerprint_document_batch(batch: DocumentBatch) -> str:
     """Compute deterministic corpus snapshot identity from loaded document contents."""
-    canonical_documents = [
-        {
-            "doc_id": document.doc_id,
-            "source_path": str(document.source_path),
-            "text": document.text,
-        }
-        for document in batch.documents
-    ]
+    canonical_documents = sorted(
+        [{"doc_id": document.doc_id, "text": document.text} for document in batch.documents],
+        key=lambda item: item["doc_id"],
+    )
     payload = json.dumps(canonical_documents, ensure_ascii=False, separators=(",", ":"))
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return f"sha256:{digest}"

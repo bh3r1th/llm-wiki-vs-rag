@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 
 from llm_wiki_vs_rag.config import AppConfig, BenchmarkConfig, LLMConfig, RAGConfig, WikiConfig
+from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
 from llm_wiki_vs_rag.models import QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.rag.pipeline import answer_rag_query
@@ -90,3 +91,19 @@ def test_wiki_ingest_writes_canonical_snapshot_identity(monkeypatch, tmp_path):
 
     payload = (paths.wiki_dir / "snapshot.json").read_text(encoding="utf-8")
     assert '"snapshot_id": "sha256:' in payload
+
+
+def test_snapshot_fingerprint_is_content_based_across_different_roots(tmp_path):
+    root_a = tmp_path / "clone_a"
+    root_b = tmp_path / "clone_b"
+    root_a.mkdir(parents=True, exist_ok=True)
+    root_b.mkdir(parents=True, exist_ok=True)
+    (root_a / "001.txt").write_text("alpha", encoding="utf-8")
+    (root_a / "002.md").write_text("beta", encoding="utf-8")
+    (root_b / "001.txt").write_text("alpha", encoding="utf-8")
+    (root_b / "002.md").write_text("beta", encoding="utf-8")
+
+    batch_a = load_source_documents(root_a)
+    batch_b = load_source_documents(root_b)
+
+    assert fingerprint_document_batch(batch_a) == fingerprint_document_batch(batch_b)
