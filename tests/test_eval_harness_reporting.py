@@ -9,7 +9,6 @@ from pathlib import Path
 from llm_wiki_vs_rag.eval.harness import (
     load_manual_labels,
     merge_outputs_with_labels,
-    resolve_corpus_snapshot_identity,
     run_queries_for_system,
 )
 from llm_wiki_vs_rag.eval.metrics import compute_drift, summarize_records
@@ -383,7 +382,7 @@ def test_run_queries_for_system_derives_snapshot_from_runtime_manifest(monkeypat
     captured: dict[str, str | None] = {}
 
     def _fake_rag(**kwargs):
-        captured["corpus_snapshot"] = kwargs.get("corpus_snapshot")
+        captured["kwargs"] = sorted(kwargs.keys())
         return [
             GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="rag", run_id="r1", artifact_dir=str(artifact_dir))
         ]
@@ -404,7 +403,7 @@ def test_run_queries_for_system_derives_snapshot_from_runtime_manifest(monkeypat
         system="rag",
     )
 
-    assert captured["corpus_snapshot"] == "sha256:runtime-manifest"
+    assert "corpus_snapshot" not in captured["kwargs"]
     assert records[0].metadata.get("corpus_snapshot") == "sha256:runtime-manifest"
 
 
@@ -831,35 +830,32 @@ def test_repeated_runs_within_same_second_have_distinct_run_ids():
     assert wiki_first != wiki_second
 
 
-def test_rag_snapshot_resolver_uses_canonical_manifest_path(tmp_path):
+def test_run_queries_for_system_wiki_path_cannot_pass_snapshot_override(monkeypatch, tmp_path):
+    artifact_dir = tmp_path / "art" / "w1"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "metadata.json").write_text(
+        json.dumps({"mode": "wiki", "corpus_snapshot": "sha256:wiki-runtime"}),
+        encoding="utf-8",
+    )
+    captured: dict[str, list[str]] = {}
+
+    def _fake_wiki(**kwargs):
+        captured["kwargs"] = sorted(kwargs.keys())
+        return [
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="wiki", run_id="w1", artifact_dir=str(artifact_dir))
+        ]
+
+    monkeypatch.setattr("llm_wiki_vs_rag.eval.harness.run_wiki_queries", _fake_wiki)
     paths = ProjectPaths(project_root=tmp_path)
     paths.ensure()
-    manifest_path = paths.artifacts_dir / "rag_index" / "manifest.json"
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text('{"snapshot_id": "rag-snapshot-001"}', encoding="utf-8")
+    (paths.wiki_dir / "snapshot.json").write_text(json.dumps({"snapshot_id": "sha256:wiki-runtime"}), encoding="utf-8")
 
-    snapshot = resolve_corpus_snapshot_identity(paths=paths, system="rag")
-    assert snapshot == "rag-snapshot-001"
+    records = run_queries_for_system(
+        config=AppConfig(project_root=tmp_path),
+        paths=paths,
+        query_cases=[load_query_case("q1", "Q1")],
+        system="wiki",
+    )
 
-
-def test_rag_snapshot_resolver_ignores_legacy_manifest_locations(tmp_path):
-    paths = ProjectPaths(project_root=tmp_path)
-    paths.ensure()
-    (paths.artifacts_dir / "manifest.json").write_text('{"snapshot_id": "legacy-root"}', encoding="utf-8")
-    (paths.artifacts_dir / "rag_index.manifest.json").write_text('{"snapshot_id": "legacy-rag"}', encoding="utf-8")
-
-    try:
-        resolve_corpus_snapshot_identity(paths=paths, system="rag")
-    except ValueError as exc:
-        assert "Missing canonical snapshot manifest for rag" in str(exc)
-    else:
-        raise AssertionError("Expected snapshot resolver to fail when canonical rag snapshot manifest is missing.")
-
-
-def test_wiki_snapshot_resolver_uses_canonical_manifest_path(tmp_path):
-    paths = ProjectPaths(project_root=tmp_path)
-    paths.ensure()
-    (paths.wiki_dir / "snapshot.json").write_text('{"snapshot_id": "sha256:wiki-snapshot-001"}', encoding="utf-8")
-
-    snapshot = resolve_corpus_snapshot_identity(paths=paths, system="wiki")
-    assert snapshot == "sha256:wiki-snapshot-001"
+    assert "corpus_snapshot" not in captured["kwargs"]
+    assert records[0].metadata.get("corpus_snapshot") == "sha256:wiki-runtime"

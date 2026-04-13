@@ -28,8 +28,7 @@ class RAGConfig(BaseModel):
 
 class WikiConfig(BaseModel):
     """Configuration for ingest-time synthesis (LLM Wiki)."""
-
-    query_top_k: int = Field(default=5, ge=1)
+    pass
 
 
 class BenchmarkConfig(BaseModel):
@@ -49,9 +48,4 @@ class AppConfig(BaseModel):
 
     def retrieval_top_k(self) -> int:
         """Shared retrieval budget policy for query-time benchmark comparisons."""
-        if self.benchmark.locked and self.rag.top_k != self.wiki.query_top_k:
-            raise ValueError(
-                "Locked benchmark mode requires retrieval parity: "
-                f"rag.top_k={self.rag.top_k} must equal wiki.query_top_k={self.wiki.query_top_k}."
-            )
         return self.rag.top_k

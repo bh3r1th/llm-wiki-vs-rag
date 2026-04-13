@@ -72,13 +72,12 @@ def run_wiki_queries(
     config: AppConfig,
     paths: ProjectPaths,
     query_cases: list[QueryCase],
-    corpus_snapshot: str | None = None,
 ) -> list[GenerationResult]:
     """Run query-time answer generation strictly from wiki pages."""
     pages = load_pages(paths.wiki_dir)
     llm_client = LLMClient(config=config.llm)
     top_k = config.retrieval_top_k()
-    snapshot_identity = corpus_snapshot or _resolve_wiki_snapshot_identity(paths)
+    snapshot_identity = _resolve_wiki_snapshot_identity(paths)
 
     results: list[GenerationResult] = []
     for query in query_cases:
