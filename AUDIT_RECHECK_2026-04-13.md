@@ -2,14 +2,16 @@
 
 ## Remaining critical benchmark credibility issues
 
-1. **Execution fingerprint can misreport the actual model used.**
-   `compute_execution_fingerprint()` hashes `config.llm.model_name`, while runtime model resolution in `LLMClient` can come from `LLM_MODEL` env fallback. If config keeps default `dummy-model` but env sets a real model, artifacts still claim the wrong model identity.
+1. **Execution fingerprint is not enforced against live query-time config.**
+   Query paths load `execution_fingerprint` from manifests and copy it into per-query artifacts, but they do not verify that the current runtime config still hashes to that fingerprint before running retrieval and generation. This allows benchmark-significant drift (for example changing `rag.top_k`) while artifacts continue to claim the old execution identity.
+
+2. **Phase-scoped query runs can silently drop non-target rows, enabling cherry-picked cohorts.**
+   `run_queries_for_system(..., target_phase=...)` filters to matching phase rows and proceeds without requiring that all provided rows match the requested phase. That means a mixed query file can produce a partial subset run without an explicit failure, which can undermine fairness if this is used as a benchmark result.
 
 ## Remaining contract deviations
 
-1. **README run examples are not executable as written.**
-   CLI requires `--phase` for `run-rag-queries` and `run-wiki-queries`, but README examples omit it.
+1. **No additional hard contract deviations found in the current code/tests beyond the credibility gaps above.**
 
 ## Dead code still worth removing before experiment
 
-1. **None found in runtime benchmark paths worth immediate removal.**
+1. **None obvious in core benchmark runtime paths.**
