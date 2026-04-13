@@ -351,6 +351,37 @@ def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monke
     assert [record.category for record in records] == ["policy", "history"]
 
 
+def test_run_queries_for_system_fails_on_snapshot_mismatch_in_artifact_metadata(monkeypatch, tmp_path):
+    artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:stale-snapshot"}), encoding="utf-8")
+    monkeypatch.setattr(
+        "llm_wiki_vs_rag.eval.harness.run_rag_queries",
+        lambda **_kwargs: [
+            GenerationResult(query_id="q1", answer="a1", mode="rag", artifact_dir=str(artifact_dir)),
+        ],
+    )
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": "sha256:canonical-snapshot"}),
+        encoding="utf-8",
+    )
+
+    try:
+        run_queries_for_system(
+            config=AppConfig(project_root=tmp_path),
+            paths=paths,
+            query_cases=[load_query_case("q1", "Q1")],
+            system="rag",
+        )
+    except ValueError as exc:
+        assert "Run snapshot attribution mismatch" in str(exc)
+    else:
+        raise AssertionError("Expected run snapshot attribution mismatch to fail fast.")
+
+
 def load_query_case(query_id: str, question: str):
     from llm_wiki_vs_rag.eval.models import EvalQueryCase
 

@@ -658,3 +658,135 @@ def test_compare_systems_fails_when_query_text_or_category_mismatch_for_same_que
         assert "q1" in str(exc)
     else:
         raise AssertionError("Expected compare-systems to fail when matched rows differ in question/category.")
+
+
+def test_evaluate_rag_rejects_non_rag_rows(tmp_path):
+    run_file = tmp_path / "mixed.jsonl"
+    run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "rag", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a"}})
+        + "\n"
+        + json.dumps({"query_id": "q2", "system": "wiki", "phase": "phase_2", "question": "Q2", "category": "policy", "answer": "A2", "metadata": {"corpus_snapshot": "snap-b"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command("evaluate-rag", AppConfig(project_root=tmp_path), run_file=str(run_file), labels_file=str(labels_file))
+    except ValueError as exc:
+        assert "System purity violation" in str(exc)
+    else:
+        raise AssertionError("Expected evaluate-rag to reject mixed/non-rag rows.")
+
+
+def test_evaluate_wiki_rejects_non_wiki_rows(tmp_path):
+    run_file = tmp_path / "mixed.jsonl"
+    run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a"}})
+        + "\n"
+        + json.dumps({"query_id": "q2", "system": "rag", "phase": "phase_2", "question": "Q2", "category": "policy", "answer": "A2", "metadata": {"corpus_snapshot": "snap-b"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command("evaluate-wiki", AppConfig(project_root=tmp_path), run_file=str(run_file), labels_file=str(labels_file))
+    except ValueError as exc:
+        assert "System purity violation" in str(exc)
+    else:
+        raise AssertionError("Expected evaluate-wiki to reject mixed/non-wiki rows.")
+
+
+def test_compare_systems_rejects_impure_input_files(tmp_path):
+    rag_run_file = tmp_path / "rag.jsonl"
+    rag_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a"}})
+        + "\n"
+        + json.dumps({"query_id": "q2", "system": "rag", "phase": "phase_2", "question": "Q2", "category": "policy", "answer": "A2", "metadata": {"corpus_snapshot": "snap-b"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    wiki_run_file = tmp_path / "wiki.jsonl"
+    wiki_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a"}})
+        + "\n"
+        + json.dumps({"query_id": "q2", "system": "wiki", "phase": "phase_2", "question": "Q2", "category": "policy", "answer": "A2", "metadata": {"corpus_snapshot": "snap-b"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command(
+            "compare-systems",
+            AppConfig(project_root=tmp_path),
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+        )
+    except ValueError as exc:
+        assert "System purity violation" in str(exc)
+    else:
+        raise AssertionError("Expected compare-systems to reject impure system input files.")
+
+
+def test_compare_systems_requires_phase_1_and_phase_2(tmp_path):
+    rag_run_file = tmp_path / "rag.jsonl"
+    rag_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "rag", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    wiki_run_file = tmp_path / "wiki.jsonl"
+    wiki_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command(
+            "compare-systems",
+            AppConfig(project_root=tmp_path),
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+        )
+    except ValueError as exc:
+        assert "requires both phase_1 and phase_2" in str(exc)
+    else:
+        raise AssertionError("Expected phase benchmark mode to require both phases.")
+
+
+def test_evaluate_rag_requires_phase_1_and_phase_2(tmp_path):
+    run_file = tmp_path / "rag.jsonl"
+    run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "rag", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command("evaluate-rag", AppConfig(project_root=tmp_path), run_file=str(run_file), labels_file=str(labels_file))
+    except ValueError as exc:
+        assert "requires both phase_1 and phase_2" in str(exc)
+    else:
+        raise AssertionError("Expected evaluate-rag benchmark mode to require both phases.")

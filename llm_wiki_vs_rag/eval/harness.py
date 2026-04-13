@@ -114,6 +114,32 @@ def run_queries_for_system(
     else:
         raise ValueError(f"Unsupported system: {system}")
 
+    run_metadata = {"corpus_snapshot": snapshot_identity}
+    seen_artifact_snapshots: set[str] = set()
+    for result in results:
+        if not result.artifact_dir:
+            continue
+        metadata_path = Path(result.artifact_dir) / "metadata.json"
+        if not metadata_path.exists():
+            continue
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError(f"Invalid artifact metadata payload for system={system}: {metadata_path}")
+        artifact_snapshot = str(payload.get("corpus_snapshot", "")).strip()
+        if not artifact_snapshot:
+            continue
+        seen_artifact_snapshots.add(artifact_snapshot)
+        if artifact_snapshot != snapshot_identity:
+            raise ValueError(
+                "Run snapshot attribution mismatch: "
+                f"system={system}, expected={snapshot_identity}, artifact={artifact_snapshot}, path={metadata_path}."
+            )
+    if len(seen_artifact_snapshots) > 1:
+        raise ValueError(
+            "Run snapshot attribution mismatch: mixed corpus snapshots observed in per-query artifacts for "
+            f"system={system}, snapshots={sorted(seen_artifact_snapshots)}."
+        )
+
     by_query_id: dict[str, deque[EvalQueryCase]] = defaultdict(deque)
     for item in query_cases:
         by_query_id[item.query_id].append(item)
@@ -141,6 +167,7 @@ def run_queries_for_system(
                     "used_context_ids": result.used_context_ids,
                     "artifact_dir": result.artifact_dir,
                     "corpus_snapshot": snapshot_identity,
+                    "run_corpus_snapshot": run_metadata["corpus_snapshot"],
                 },
             )
         )
