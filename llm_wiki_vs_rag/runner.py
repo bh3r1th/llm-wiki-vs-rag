@@ -21,8 +21,8 @@ from llm_wiki_vs_rag.wiki.pipeline import ingest_wiki
 
 def _validate_benchmark_llm_config(config: AppConfig) -> None:
     provider = config.llm.provider.lower()
-    if config.llm.mock_mode or provider in {"mock", "stub"}:
-        raise ValueError("Benchmark commands cannot run with llm mock/stub mode enabled.")
+    if config.llm.mock_mode:
+        raise ValueError("Benchmark commands cannot run with llm mock_mode enabled.")
     if provider != "openai-compatible":
         raise ValueError(f"Unsupported benchmark LLM provider: {config.llm.provider}.")
     if not config.llm.base_url:
@@ -42,6 +42,19 @@ def _validate_comparison_cohorts(rag_outputs, wiki_outputs) -> None:
         raise ValueError(
             "Cannot compare systems with mismatched (query_id, phase) cohorts. "
             f"rag_only_sample={rag_only}, wiki_only_sample={wiki_only}."
+        )
+
+
+def _validate_system_uniqueness(outputs, system_name: str) -> None:
+    counts: dict[tuple[str, str], int] = {}
+    for record in outputs:
+        key = (record.query_id, record.phase)
+        counts[key] = counts.get(key, 0) + 1
+    duplicates = sorted((query_id, phase, count) for (query_id, phase), count in counts.items() if count > 1)
+    if duplicates:
+        raise ValueError(
+            f"Cannot compare systems when one system has duplicate (query_id, phase) rows: "
+            f"system={system_name}, duplicate_sample={duplicates[:5]}."
         )
 
 
@@ -78,6 +91,8 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         output_dir = Path(str(kwargs.get("output_dir") or paths.artifacts_dir / "compare-systems"))
         rag_outputs = load_run_outputs(rag_run_file)
         wiki_outputs = load_run_outputs(wiki_run_file)
+        _validate_system_uniqueness(rag_outputs, "rag")
+        _validate_system_uniqueness(wiki_outputs, "wiki")
         _validate_comparison_cohorts(rag_outputs, wiki_outputs)
         outputs = rag_outputs + wiki_outputs
         labels = load_manual_labels(labels_file)

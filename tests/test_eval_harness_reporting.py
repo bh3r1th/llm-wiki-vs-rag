@@ -139,6 +139,44 @@ def test_merge_uses_system_plus_query_id_plus_phase_for_labels():
     assert by_system["wiki"].accuracy == "wrong"
 
 
+def test_merge_fails_when_any_output_row_is_unlabeled():
+    outputs = [
+        RunOutputRecord(query_id="q1", system="rag", phase="phase_1", question="Q1", category="policy", answer="A1"),
+        RunOutputRecord(query_id="q2", system="rag", phase="phase_2", question="Q2", category="policy", answer="A2"),
+    ]
+    labels = {
+        ("rag", "q1", "phase_1"): load_manual_labels_from_row("rag", "q1", "phase_1", "correct"),
+    }
+
+    try:
+        merge_outputs_with_labels(outputs, labels)
+    except ValueError as exc:
+        assert "missing_or_partial_label_sample" in str(exc)
+        assert "q2" in str(exc)
+        assert "phase_2" in str(exc)
+    else:
+        raise AssertionError("Expected unlabeled output rows to fail evaluation merge.")
+
+
+def test_merge_fails_when_any_output_row_has_partial_label():
+    outputs = [
+        RunOutputRecord(query_id="q1", system="rag", phase="phase_1", question="Q1", category="policy", answer="A1"),
+    ]
+    partial_label = load_manual_labels_from_row("rag", "q1", "phase_1", "correct").model_copy(
+        update={"accuracy": None}
+    )
+    labels = {("rag", "q1", "phase_1"): partial_label}
+
+    try:
+        merge_outputs_with_labels(outputs, labels)
+    except ValueError as exc:
+        assert "missing_or_partial_label_sample" in str(exc)
+        assert "q1" in str(exc)
+        assert "phase_1" in str(exc)
+    else:
+        raise AssertionError("Expected partial label rows to fail evaluation merge.")
+
+
 def load_manual_labels_from_row(system: str, query_id: str, phase: str, accuracy: str):
     return load_manual_labels_from_text(
         "\n".join(

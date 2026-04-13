@@ -90,9 +90,28 @@ def test_benchmark_commands_reject_mock_mode(tmp_path):
     try:
         run_command("run-rag-queries", config, query_file=str(query_file))
     except ValueError as exc:
-        assert "cannot run with llm mock/stub mode" in str(exc)
+        assert "cannot run with llm mock_mode enabled" in str(exc)
     else:
         raise AssertionError("Expected benchmark command to fail fast when mock mode is enabled.")
+
+
+def test_benchmark_commands_validate_single_mock_control_mechanism(tmp_path):
+    config = AppConfig(
+        project_root=tmp_path,
+        llm=LLMConfig(provider="mock", mock_mode=False, base_url="http://example", api_key="key", model_name="m"),
+    )
+    query_file = tmp_path / "queries.jsonl"
+    query_file.write_text(
+        json.dumps({"query_id": "q1", "question": "Q?", "category": "policy", "phase": "phase_1"}) + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        run_command("run-rag-queries", config, query_file=str(query_file))
+    except ValueError as exc:
+        assert "Unsupported benchmark LLM provider: mock" in str(exc)
+    else:
+        raise AssertionError("Expected benchmark validation to ignore provider alias and enforce mock_mode only.")
 
 
 def test_benchmark_commands_require_provider_config(tmp_path):
@@ -267,3 +286,69 @@ def test_compare_systems_fails_when_query_phase_pairs_do_not_match(tmp_path):
         assert "mismatched (query_id, phase) cohorts" in str(exc)
     else:
         raise AssertionError("Expected compare-systems to fail when query/phase pair cohorts differ.")
+
+
+def test_compare_systems_fails_when_duplicate_system_rows_exist(tmp_path):
+    rag_run_file = tmp_path / "rag.jsonl"
+    rag_run_file.write_text(
+        json.dumps(
+            {
+                "query_id": "q1",
+                "system": "rag",
+                "phase": "phase_1",
+                "question": "Q1",
+                "category": "policy",
+                "answer": "A1",
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "query_id": "q1",
+                "system": "rag",
+                "phase": "phase_1",
+                "question": "Q1 duplicate",
+                "category": "policy",
+                "answer": "A1 duplicate",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    wiki_run_file = tmp_path / "wiki.jsonl"
+    wiki_run_file.write_text(
+        json.dumps(
+            {
+                "query_id": "q1",
+                "system": "wiki",
+                "phase": "phase_1",
+                "question": "Q1",
+                "category": "policy",
+                "answer": "A1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n"
+        "rag,q1,phase_1,correct,full,correct,true,true,none,true,\n"
+        "wiki,q1,phase_1,correct,full,correct,true,true,none,true,\n",
+        encoding="utf-8",
+    )
+
+    config = AppConfig(project_root=tmp_path)
+    try:
+        run_command(
+            "compare-systems",
+            config,
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+        )
+    except ValueError as exc:
+        assert "duplicate (query_id, phase) rows" in str(exc)
+        assert "q1" in str(exc)
+    else:
+        raise AssertionError("Expected compare-systems to fail on duplicate per-system rows.")
