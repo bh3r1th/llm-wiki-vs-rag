@@ -35,6 +35,8 @@ class RetrievedChunk(BaseModel):
     doc_id: str = Field(min_length=1)
     chunk_id: str = Field(min_length=1)
     text: str = Field(min_length=1)
+    source_path: Path | None = None
+    position: dict[str, int] = Field(default_factory=dict)
     score: float = 0.0
 
 
