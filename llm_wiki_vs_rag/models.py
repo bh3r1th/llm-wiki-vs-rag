@@ -26,7 +26,6 @@ class QueryCase(BaseModel):
 
     query_id: str = Field(min_length=1)
     question: str = Field(min_length=1)
-    reference_answer: str | None = None
 
 
 class RetrievedChunk(BaseModel):

@@ -15,8 +15,67 @@ def _avg(values: list[float]) -> float | None:
     return round(sum(values) / len(values), 3) if values else None
 
 
+def _validate_contradiction_invariants(records: list[EvaluationRecord]) -> None:
+    offending = [
+        {"system": record.system, "query_id": record.query_id, "phase": record.phase}
+        for record in records
+        if record.contradiction_resolved is True and record.contradiction_detected is not True
+    ]
+    if offending:
+        raise ValueError(
+            "Invalid contradiction labels in evaluation records: contradiction_resolved=True requires "
+            "contradiction_detected=True. "
+            f"offending_sample={offending[:5]}"
+        )
+
+
+def _validate_phase_cohort_alignment(records: list[EvaluationRecord]) -> None:
+    grouped: dict[tuple[str, str], list[EvaluationRecord]] = defaultdict(list)
+    for record in records:
+        grouped[(record.system, record.category)].append(record)
+
+    mismatches: list[dict[str, object]] = []
+    for (system, category), bucket in sorted(grouped.items()):
+        phase_1 = {
+            (record.query_id, record.question, record.category)
+            for record in bucket
+            if record.phase == "phase_1"
+        }
+        phase_2 = {
+            (record.query_id, record.question, record.category)
+            for record in bucket
+            if record.phase == "phase_2"
+        }
+        if phase_1 == phase_2:
+            continue
+        only_phase_1 = sorted(phase_1 - phase_2)
+        only_phase_2 = sorted(phase_2 - phase_1)
+        mismatches.append(
+            {
+                "system": system,
+                "category": category,
+                "phase_1_only_sample": [
+                    {"query_id": qid, "question": question, "category": cat}
+                    for qid, question, cat in only_phase_1[:3]
+                ],
+                "phase_2_only_sample": [
+                    {"query_id": qid, "question": question, "category": cat}
+                    for qid, question, cat in only_phase_2[:3]
+                ],
+            }
+        )
+    if mismatches:
+        raise ValueError(
+            "Phase drift requires identical phase_1 and phase_2 query cohorts by (query_id, question, category). "
+            f"mismatch_sample={mismatches[:5]}"
+        )
+
+
 def summarize_records(records: list[EvaluationRecord], group_fields: tuple[str, ...]) -> list[EvalSummary]:
     """Aggregate records by requested dimensions and compute percentages."""
+    labeled_records = [record for record in records if record.is_labeled]
+    _validate_contradiction_invariants(labeled_records)
+
     grouped: dict[tuple[str, ...], list[EvaluationRecord]] = defaultdict(list)
     for record in records:
         key = tuple(str(getattr(record, field)) for field in group_fields)
@@ -32,6 +91,11 @@ def summarize_records(records: list[EvaluationRecord], group_fields: tuple[str, 
         if labeled:
             contradiction_detected_total = sum(1 for record in labeled if record.contradiction_detected)
             contradiction_resolved_total = sum(1 for record in labeled if record.contradiction_resolved)
+            if contradiction_resolved_total > contradiction_detected_total:
+                raise ValueError(
+                    "Invalid contradiction metrics input: resolved count exceeds detected count. "
+                    f"group_by={dict(zip(group_fields, key))}, detected={contradiction_detected_total}, resolved={contradiction_resolved_total}"
+                )
             accuracy_counts = {
                 "correct": sum(1 for record in labeled if record.accuracy == "correct"),
                 "partial": sum(1 for record in labeled if record.accuracy == "partial"),
@@ -98,10 +162,13 @@ def summarize_records(records: list[EvaluationRecord], group_fields: tuple[str, 
 
 def compute_drift(records: list[EvaluationRecord]) -> list[DriftSummary]:
     """Compute phase-2 minus phase-1 deltas for key quality indicators."""
+    labeled_records = [record for record in records if record.is_labeled]
+    _validate_contradiction_invariants(labeled_records)
+    _validate_phase_cohort_alignment(labeled_records)
+
     grouped: dict[tuple[str, str], list[EvaluationRecord]] = defaultdict(list)
-    for record in records:
-        if record.is_labeled:
-            grouped[(record.system, record.category)].append(record)
+    for record in labeled_records:
+        grouped[(record.system, record.category)].append(record)
 
     drifts: list[DriftSummary] = []
     for (system, category), bucket in sorted(grouped.items()):

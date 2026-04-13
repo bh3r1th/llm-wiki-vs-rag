@@ -67,6 +67,27 @@ def test_load_manual_labels(tmp_path):
     assert labels[("wiki", "q2", "phase_2")].compression_loss == "major"
 
 
+def test_load_manual_labels_rejects_resolved_without_detected(tmp_path):
+    labels_path = tmp_path / "labels.csv"
+    labels_path.write_text(
+        "\n".join(
+            [
+                "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "rag,q1,phase_1,correct,full,correct,false,true,none,true,invalid",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    try:
+        load_manual_labels(labels_path)
+    except ValueError as exc:
+        assert "Invalid contradiction labels" in str(exc)
+        assert "q1" in str(exc)
+        assert "phase_1" in str(exc)
+    else:
+        raise AssertionError("Expected contradiction_resolved=True without detected to fail.")
+
+
 def test_metric_aggregation_and_drift():
     labels_csv = "\n".join([
         "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
@@ -107,6 +128,27 @@ def test_contradiction_resolved_pct_uses_only_detected_rows():
 
     by_system = summarize_records(records, group_fields=("system",))
     assert by_system[0].metrics["contradiction"]["resolved_pct"] == 100.0
+
+
+def test_contradiction_resolved_percentage_cannot_exceed_100():
+    outputs = [
+        RunOutputRecord(query_id="q1", system="rag", phase="phase_1", question="Q1", category="policy", answer="A1"),
+    ]
+    labels = {
+        (
+            "rag",
+            "q1",
+            "phase_1",
+        ): load_manual_labels_from_row("rag", "q1", "phase_1", "correct").model_copy(
+            update={"contradiction_detected": False, "contradiction_resolved": True}
+        )
+    }
+    try:
+        merge_outputs_with_labels(outputs, labels)
+    except ValueError as exc:
+        assert "Invalid contradiction labels" in str(exc)
+    else:
+        raise AssertionError("Expected invalid contradiction labels to fail before percentage computation.")
 
 
 def test_contradiction_resolved_pct_is_not_applicable_when_no_detected_rows():
@@ -278,8 +320,8 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
 
     def _fake_rag(**_kwargs):
         return [
-            GenerationResult(query_id="q1", answer="a1", mode="rag", run_id="r1", latency_ms=11.1, artifact_dir=str(artifact_one), prompt_tokens=3, completion_tokens=4, total_tokens=7),
-            GenerationResult(query_id="q2", answer="a2", mode="rag", run_id="r2", latency_ms=22.2, artifact_dir=str(artifact_two), prompt_tokens=5, completion_tokens=6, total_tokens=11),
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="rag", run_id="r1", latency_ms=11.1, artifact_dir=str(artifact_one), prompt_tokens=3, completion_tokens=4, total_tokens=7),
+            GenerationResult(query_id="q2::phase=phase_1", answer="a2", mode="rag", run_id="r2", latency_ms=22.2, artifact_dir=str(artifact_two), prompt_tokens=5, completion_tokens=6, total_tokens=11),
         ]
 
     monkeypatch.setattr("llm_wiki_vs_rag.eval.harness.run_rag_queries", _fake_rag)
@@ -315,7 +357,7 @@ def test_run_queries_for_system_wiki_records_written_snapshot_identity(monkeypat
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_wiki_queries",
         lambda **_kwargs: [
-            GenerationResult(query_id="q1", answer="a1", mode="wiki", run_id="w1", latency_ms=1.1, artifact_dir=str(artifact_dir))
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="wiki", run_id="w1", latency_ms=1.1, artifact_dir=str(artifact_dir))
         ],
     )
     paths = ProjectPaths(project_root=tmp_path)
@@ -341,8 +383,8 @@ def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monke
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
-            GenerationResult(query_id="q1", answer="a1", mode="rag", artifact_dir=str(artifact_one)),
-            GenerationResult(query_id="q1", answer="a2", mode="rag", artifact_dir=str(artifact_two)),
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="rag", artifact_dir=str(artifact_one)),
+            GenerationResult(query_id="q1::phase=phase_2", answer="a2", mode="rag", artifact_dir=str(artifact_two)),
         ],
     )
     paths = ProjectPaths(project_root=tmp_path)
@@ -367,6 +409,45 @@ def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monke
     assert [record.category for record in records] == ["policy", "history"]
 
 
+def test_run_queries_normalization_is_order_independent(monkeypatch, tmp_path):
+    artifact_one = tmp_path / "art" / "reordered-1"
+    artifact_two = tmp_path / "art" / "reordered-2"
+    artifact_one.mkdir(parents=True, exist_ok=True)
+    artifact_two.mkdir(parents=True, exist_ok=True)
+    (artifact_one / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_two / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+
+    def _fake_rag(**_kwargs):
+        return [
+            GenerationResult(query_id="q1::phase=phase_2", answer="a2", mode="rag", artifact_dir=str(artifact_two)),
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="rag", artifact_dir=str(artifact_one)),
+        ]
+
+    monkeypatch.setattr("llm_wiki_vs_rag.eval.harness.run_rag_queries", _fake_rag)
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": "sha256:rag-snapshot"}),
+        encoding="utf-8",
+    )
+
+    records = run_queries_for_system(
+        config=AppConfig(project_root=tmp_path),
+        paths=paths,
+        query_cases=[
+            EvalQueryCase(query_id="q1", question="Phase one question", category="policy", phase="phase_1"),
+            EvalQueryCase(query_id="q1", question="Phase two question", category="history", phase="phase_2"),
+        ],
+        system="rag",
+    )
+    by_phase = {record.phase: record for record in records}
+    assert by_phase["phase_1"].question == "Phase one question"
+    assert by_phase["phase_1"].category == "policy"
+    assert by_phase["phase_2"].question == "Phase two question"
+    assert by_phase["phase_2"].category == "history"
+
+
 def test_run_queries_for_system_fails_on_snapshot_mismatch_in_artifact_metadata(monkeypatch, tmp_path):
     artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -374,7 +455,7 @@ def test_run_queries_for_system_fails_on_snapshot_mismatch_in_artifact_metadata(
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
-            GenerationResult(query_id="q1", answer="a1", mode="rag", artifact_dir=str(artifact_dir)),
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="rag", artifact_dir=str(artifact_dir)),
         ],
     )
     paths = ProjectPaths(project_root=tmp_path)
@@ -405,7 +486,7 @@ def test_run_queries_for_system_fails_when_artifact_snapshot_missing(monkeypatch
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
-            GenerationResult(query_id="q1", answer="a1", mode="rag", artifact_dir=str(artifact_dir)),
+            GenerationResult(query_id="q1::phase=phase_1", answer="a1", mode="rag", artifact_dir=str(artifact_dir)),
         ],
     )
     paths = ProjectPaths(project_root=tmp_path)
@@ -521,6 +602,31 @@ def test_drift_contradiction_resolved_uses_detected_denominator_only():
     records = merge_outputs_with_labels(outputs, labels)
     drifts = compute_drift(records)
     assert drifts[0].contradiction_resolved_rate_delta == -1.0
+
+
+def test_drift_fails_when_phase_cohorts_differ_by_query_identity_content():
+    outputs = [
+        RunOutputRecord(query_id="q1", system="rag", phase="phase_1", question="Q one", category="policy", answer="A1"),
+        RunOutputRecord(query_id="q2", system="rag", phase="phase_2", question="Q two", category="policy", answer="A2"),
+    ]
+    labels = load_manual_labels_from_text(
+        "\n".join(
+            [
+                "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "rag,q1,phase_1,correct,full,correct,true,true,none,true,",
+                "rag,q2,phase_2,correct,full,correct,true,true,none,true,",
+            ]
+        )
+    )
+    records = merge_outputs_with_labels(outputs, labels)
+    try:
+        compute_drift(records)
+    except ValueError as exc:
+        assert "identical phase_1 and phase_2 query cohorts" in str(exc)
+        assert "q1" in str(exc)
+        assert "q2" in str(exc)
+    else:
+        raise AssertionError("Expected drift computation to fail on mismatched phase cohorts.")
 
 
 def test_load_manual_labels_fails_when_phase_missing(tmp_path):

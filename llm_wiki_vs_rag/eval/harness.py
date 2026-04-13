@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import json
-from collections import defaultdict, deque
 from pathlib import Path
 
 from llm_wiki_vs_rag.config import AppConfig
@@ -52,10 +51,28 @@ def _to_bool(raw: str) -> bool:
     return raw.strip().lower() in {"1", "true", "t", "yes", "y"}
 
 
+def _validate_contradiction_invariant_rows(rows: list[dict[str, str | bool]]) -> None:
+    offending = [
+        {
+            "system": str(row["system"]),
+            "query_id": str(row["query_id"]),
+            "phase": str(row["phase"]),
+        }
+        for row in rows
+        if bool(row["contradiction_resolved"]) and not bool(row["contradiction_detected"])
+    ]
+    if offending:
+        raise ValueError(
+            "Invalid contradiction labels: contradiction_resolved=True requires contradiction_detected=True. "
+            f"offending_sample={offending[:5]}"
+        )
+
+
 def load_manual_labels(csv_path: Path) -> dict[tuple[str, str, str], ManualEvalLabel]:
     """Load manual human labels from CSV keyed by (system, query_id, phase)."""
     labels: dict[tuple[str, str, str], ManualEvalLabel] = {}
     duplicate_keys: list[tuple[str, str, str]] = []
+    contradiction_rows: list[dict[str, str | bool]] = []
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
@@ -85,6 +102,15 @@ def load_manual_labels(csv_path: Path) -> dict[tuple[str, str, str], ManualEvalL
                 duplicate_keys.append(key)
                 continue
             labels[key] = label
+            contradiction_rows.append(
+                {
+                    "system": label.system,
+                    "query_id": label.query_id,
+                    "phase": label.phase,
+                    "contradiction_detected": label.contradiction_detected,
+                    "contradiction_resolved": label.contradiction_resolved,
+                }
+            )
     if duplicate_keys:
         sample = [
             {"system": system, "query_id": query_id, "phase": phase}
@@ -94,7 +120,12 @@ def load_manual_labels(csv_path: Path) -> dict[tuple[str, str, str], ManualEvalL
             "Manual labels must be unique per (system, query_id, phase). "
             f"duplicate_sample={sample}"
         )
+    _validate_contradiction_invariant_rows(contradiction_rows)
     return labels
+
+
+def _query_identity(case: EvalQueryCase) -> str:
+    return f"{case.query_id}::phase={case.phase}"
 
 
 def run_queries_for_system(
@@ -104,7 +135,21 @@ def run_queries_for_system(
     system: str,
 ) -> list[RunOutputRecord]:
     """Run one system over a query set and normalize outputs."""
-    query_inputs = [QueryCase(query_id=case.query_id, question=case.question) for case in query_cases]
+    query_identity_to_case: dict[str, EvalQueryCase] = {}
+    duplicate_identities: list[str] = []
+    query_inputs: list[QueryCase] = []
+    for case in query_cases:
+        identity = _query_identity(case)
+        if identity in query_identity_to_case:
+            duplicate_identities.append(identity)
+            continue
+        query_identity_to_case[identity] = case
+        query_inputs.append(QueryCase(query_id=identity, question=case.question))
+    if duplicate_identities:
+        raise ValueError(
+            "Each query case must have a unique (query_id, phase) identity per run. "
+            f"duplicate_identity_sample={duplicate_identities[:5]}"
+        )
     snapshot_identity = resolve_corpus_snapshot_identity(paths=paths, system=system)
 
     if system == "rag":
@@ -158,19 +203,21 @@ def run_queries_for_system(
             f"system={system}, snapshots={sorted(seen_artifact_snapshots)}."
         )
 
-    by_query_id: dict[str, deque[EvalQueryCase]] = defaultdict(deque)
-    for item in query_cases:
-        by_query_id[item.query_id].append(item)
-
     normalized: list[RunOutputRecord] = []
+    seen_output_identities: set[str] = set()
     for result in results:
-        queue = by_query_id.get(result.query_id)
-        if not queue:
-            raise ValueError(f"Run output query_id not found in query set for system={system}: {result.query_id}")
-        case = queue.popleft()
+        identity = result.query_id
+        case = query_identity_to_case.get(identity)
+        if case is None:
+            raise ValueError(
+                f"Run output query identity not found in query set for system={system}: {identity}"
+            )
+        if identity in seen_output_identities:
+            raise ValueError(f"Duplicate run output query identity for system={system}: {identity}")
+        seen_output_identities.add(identity)
         normalized.append(
             RunOutputRecord(
-                query_id=result.query_id,
+                query_id=case.query_id,
                 system=system,
                 phase=case.phase,
                 question=case.question,
@@ -187,6 +234,12 @@ def run_queries_for_system(
                     "corpus_snapshot": snapshot_identity,
                 },
             )
+        )
+    missing_output_identities = set(query_identity_to_case) - seen_output_identities
+    if missing_output_identities:
+        raise ValueError(
+            "Run outputs are missing query identities from the input query set. "
+            f"system={system}, missing_identity_sample={sorted(missing_output_identities)[:5]}"
         )
     return normalized
 
@@ -215,6 +268,7 @@ def merge_outputs_with_labels(
 ) -> list[EvaluationRecord]:
     """Merge system outputs with manual labels into evaluation records."""
     missing_keys: list[tuple[str, str, str]] = []
+    invalid_contradiction_rows: list[dict[str, str | bool]] = []
     for output in run_outputs:
         key = (output.system, output.query_id, output.phase)
         label = labels_by_system_query_phase.get(key)
@@ -231,6 +285,16 @@ def merge_outputs_with_labels(
             or label.provenance_fidelity is None
         ):
             missing_keys.append(key)
+            continue
+        invalid_contradiction_rows.append(
+            {
+                "system": output.system,
+                "query_id": output.query_id,
+                "phase": output.phase,
+                "contradiction_detected": label.contradiction_detected,
+                "contradiction_resolved": label.contradiction_resolved,
+            }
+        )
     if missing_keys:
         sample = [
             {"system": system, "query_id": query_id, "phase": phase}
@@ -240,6 +304,7 @@ def merge_outputs_with_labels(
             "Manual labels are required for every output row and must be complete. "
             f"missing_or_partial_label_sample={sample}"
         )
+    _validate_contradiction_invariant_rows(invalid_contradiction_rows)
 
     records: list[EvaluationRecord] = []
     for output in run_outputs:

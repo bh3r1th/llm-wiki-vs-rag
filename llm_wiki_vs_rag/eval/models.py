@@ -21,7 +21,6 @@ class EvalQueryCase(BaseModel):
     question: str = Field(min_length=1)
     category: str = Field(min_length=1)
     phase: PhaseLabel
-    expected_notes: str | None = None
 
 
 class RunOutputRecord(BaseModel):
