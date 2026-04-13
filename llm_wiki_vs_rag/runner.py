@@ -379,6 +379,34 @@ def _run_phase_specific_benchmark(
     save_run_outputs(records, output_file)
 
 
+def _prevalidate_smoke_evaluation_inputs(
+    *,
+    rag_run_file: Path,
+    wiki_run_file: Path,
+    labels_file: Path,
+) -> None:
+    rag_outputs = load_run_outputs(rag_run_file)
+    wiki_outputs = load_run_outputs(wiki_run_file)
+    _validate_system_purity(rag_outputs, expected_system="rag", context=f"smoke-evaluate rag:{rag_run_file}")
+    _validate_system_purity(wiki_outputs, expected_system="wiki", context=f"smoke-evaluate wiki:{wiki_run_file}")
+    _validate_phase_snapshot_integrity(rag_outputs, context=f"smoke-evaluate rag:{rag_run_file}")
+    _validate_phase_snapshot_integrity(wiki_outputs, context=f"smoke-evaluate wiki:{wiki_run_file}")
+    _validate_execution_fingerprint_cohort_integrity(rag_outputs, context=f"smoke-evaluate rag:{rag_run_file}")
+    _validate_execution_fingerprint_cohort_integrity(wiki_outputs, context=f"smoke-evaluate wiki:{wiki_run_file}")
+    _validate_intra_system_phase_cohort_equivalence(rag_outputs, context=f"smoke-evaluate rag:{rag_run_file}")
+    _validate_intra_system_phase_cohort_equivalence(wiki_outputs, context=f"smoke-evaluate wiki:{wiki_run_file}")
+    _validate_system_uniqueness(rag_outputs, "rag")
+    _validate_system_uniqueness(wiki_outputs, "wiki")
+    _validate_cross_system_phase_snapshot_parity(rag_outputs, wiki_outputs)
+    _validate_comparison_cohorts(rag_outputs, wiki_outputs)
+    _validate_comparison_queryset_equivalence(rag_outputs, wiki_outputs)
+
+    labels = load_manual_labels(labels_file)
+    merge_outputs_with_labels(rag_outputs, labels)
+    merge_outputs_with_labels(wiki_outputs, labels)
+    merge_outputs_with_labels(rag_outputs + wiki_outputs, labels)
+
+
 def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     """Dispatch supported runner commands to pipeline entry points."""
     paths = ProjectPaths(config.project_root)
@@ -472,6 +500,38 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         labels = load_manual_labels(labels_file)
         records = merge_outputs_with_labels(outputs, labels)
         write_reports(records=records, output_dir=output_dir)
+    elif command == "smoke-evaluate":
+        rag_run_file = Path(str(kwargs["rag_run_file"]))
+        wiki_run_file = Path(str(kwargs["wiki_run_file"]))
+        labels_file = Path(str(kwargs["labels_file"]))
+        output_dir = Path(str(kwargs["output_dir"]))
+        _prevalidate_smoke_evaluation_inputs(
+            rag_run_file=rag_run_file,
+            wiki_run_file=wiki_run_file,
+            labels_file=labels_file,
+        )
+        run_command(
+            "evaluate-rag",
+            config,
+            run_file=str(rag_run_file),
+            labels_file=str(labels_file),
+            output_dir=str(output_dir / "rag"),
+        )
+        run_command(
+            "evaluate-wiki",
+            config,
+            run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+            output_dir=str(output_dir / "wiki"),
+        )
+        run_command(
+            "compare-systems",
+            config,
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+            output_dir=str(output_dir / "compare"),
+        )
     elif command == "make-label-template":
         run_file = Path(str(kwargs["run_file"]))
         output_file = Path(str(kwargs["output_file"]))
