@@ -95,7 +95,7 @@ class EvalSummary(BaseModel):
     labeled_total: int = Field(default=0, ge=0)
     avg_latency_ms: float | None = None
     avg_total_tokens: float | None = None
-    metrics: dict[str, dict[str, float | int]] = Field(default_factory=dict)
+    metrics: dict[str, dict[str, float | int | str | None]] = Field(default_factory=dict)
 
 
 class DriftSummary(BaseModel):

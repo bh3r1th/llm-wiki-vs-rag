@@ -37,13 +37,10 @@ def run_wiki_queries(
     config: AppConfig,
     paths: ProjectPaths,
     query_cases: list[QueryCase],
-    use_rag_fallback: bool | None = None,
 ) -> list[GenerationResult]:
     """Run query-time answer generation strictly from wiki pages."""
     pages = load_pages(paths.wiki_dir)
     llm_client = LLMClient(config=config.llm)
-    if use_rag_fallback:
-        raise ValueError("Benchmark wiki query path is wiki-only; RAG fallback is not supported in this function.")
     top_k = config.retrieval_top_k()
 
     results: list[GenerationResult] = []

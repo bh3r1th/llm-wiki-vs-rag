@@ -49,6 +49,9 @@ def _write_summary_csv(comparison: ComparisonReport, output_path: Path) -> None:
             ],
         )
         writer.writeheader()
+        def _fmt_pct(value: float | int | str | None) -> float | int | str:
+            return "N/A" if value is None else value
+
         for dimension, summaries in [
             ("system", comparison.summaries_by_system),
             ("phase", comparison.summaries_by_phase),
@@ -63,7 +66,9 @@ def _write_summary_csv(comparison: ComparisonReport, output_path: Path) -> None:
                         "labeled_total": summary.labeled_total,
                         "accuracy_correct_pct": summary.metrics.get("accuracy", {}).get("correct_pct", ""),
                         "latest_state_correct_pct": summary.metrics.get("latest_state", {}).get("correct_pct", ""),
-                        "contradiction_resolved_pct": summary.metrics.get("contradiction", {}).get("resolved_pct", ""),
+                        "contradiction_resolved_pct": _fmt_pct(
+                            summary.metrics.get("contradiction", {}).get("resolved_pct", "")
+                        ),
                         "avg_latency_ms": "" if summary.avg_latency_ms is None else summary.avg_latency_ms,
                         "avg_total_tokens": "" if summary.avg_total_tokens is None else summary.avg_total_tokens,
                     }
@@ -126,6 +131,9 @@ def _write_per_query_csv(records: list[EvaluationRecord], output_path: Path) -> 
 
 
 def _render_markdown_report(comparison: ComparisonReport) -> str:
+    def _fmt_pct(value: float | int | str | None) -> float | int | str:
+        return "N/A" if value is None else value
+
     lines = [
         "# RAG vs Wiki Evaluation Report",
         "",
@@ -142,7 +150,7 @@ def _render_markdown_report(comparison: ComparisonReport) -> str:
                 labeled=summary.labeled_total,
                 acc=summary.metrics.get("accuracy", {}).get("correct_pct", "-"),
                 latest=summary.metrics.get("latest_state", {}).get("correct_pct", "-"),
-                cr=summary.metrics.get("contradiction", {}).get("resolved_pct", "-"),
+                cr=_fmt_pct(summary.metrics.get("contradiction", {}).get("resolved_pct", "-")),
                 lat=summary.avg_latency_ms if summary.avg_latency_ms is not None else "-",
                 tok=summary.avg_total_tokens if summary.avg_total_tokens is not None else "-",
             )
