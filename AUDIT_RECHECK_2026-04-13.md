@@ -2,16 +2,13 @@
 
 ## Remaining critical benchmark credibility issues
 
-1. **Execution fingerprint is still not validated against live query-time runtime config.**
-   Query execution reads `execution_fingerprint` from canonical manifests and propagates it into per-query metadata, but query paths do not recompute and compare the fingerprint from the current runtime config before generation. This still permits benchmark-significant config drift (for example `rag.top_k`, chunking params, or model ID changes) while outputs continue to claim the stale fingerprint.
-
-2. **Phase-targeted query runs can still silently drop non-matching rows.**
-   `run_queries_for_system(..., target_phase=...)` filters to matching rows and proceeds even when the supplied query file contains additional rows from other phases. That behavior still permits accidental or intentional cohort slicing without a hard failure.
+1. **`evaluate-*` / `compare-systems` still accept mixed execution fingerprints within a system/phase cohort.**
+   Runtime query execution now validates the manifest fingerprint, but downstream report paths only validate snapshot and chronology tokens. There is still no hard check that all rows for a given `(system, phase)` were produced under a single benchmark execution fingerprint, so mixed-config run files can still be merged into one score.
 
 ## Remaining contract deviations
 
-1. **No additional hard contract deviations identified beyond the two benchmark-credibility blockers above.**
+1. **None newly identified beyond the fingerprint-cohort integrity gap above.**
 
 ## Dead code still worth removing before experiment
 
-1. **None clearly blocking the experiment in core runtime paths.**
+1. **No additional dead code stands out as pre-experiment risk in the core benchmark path.**
