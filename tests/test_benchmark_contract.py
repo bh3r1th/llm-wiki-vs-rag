@@ -6,11 +6,12 @@ import json
 import inspect
 from pathlib import Path
 
-from llm_wiki_vs_rag.config import AppConfig, BenchmarkConfig, LLMConfig, RAGConfig
+from llm_wiki_vs_rag.config import AppConfig, LLMConfig, RAGConfig
 from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
 from llm_wiki_vs_rag.models import QueryCase, SourceDocument
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.rag.pipeline import answer_rag_query, run_rag_queries
+from llm_wiki_vs_rag.reproducibility import compute_execution_fingerprint
 from llm_wiki_vs_rag.wiki.pipeline import ingest_wiki, run_wiki_queries
 from llm_wiki_vs_rag.wiki.prompting import build_wiki_query_prompt
 from llm_wiki_vs_rag.wiki.ingest import ingest_one_document
@@ -36,12 +37,27 @@ def test_locked_benchmark_uses_same_top_k_for_rag_and_wiki(monkeypatch, tmp_path
         "llm_wiki_vs_rag.wiki.pipeline.retrieve_wiki_pages",
         lambda pages, query, top_k: observed.append(top_k) or [],
     )
+    (paths.raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
+    snapshot = fingerprint_document_batch(load_source_documents(paths.raw_dir))
     (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
     (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
-        '{"snapshot_id": "sha256:rag-test"}',
+        json.dumps(
+            {
+                "snapshot_id": snapshot,
+                "execution_fingerprint": compute_execution_fingerprint(config=config, system="rag"),
+            }
+        ),
         encoding="utf-8",
     )
-    (paths.wiki_dir / "snapshot.json").write_text('{"snapshot_id": "sha256:wiki-test"}', encoding="utf-8")
+    (paths.wiki_dir / "snapshot.json").write_text(
+        json.dumps(
+            {
+                "snapshot_id": snapshot,
+                "execution_fingerprint": compute_execution_fingerprint(config=config, system="wiki"),
+            }
+        ),
+        encoding="utf-8",
+    )
 
     answer_rag_query(config=config, paths=paths, query=QueryCase(query_id="q-rag", question="Q?"))
     run_wiki_queries(config=config, paths=paths, query_cases=[QueryCase(query_id="q-wiki", question="Q?")])
@@ -62,7 +78,17 @@ def test_benchmark_wiki_query_path_has_no_fallback_behavior(monkeypatch, tmp_pat
     config = AppConfig(project_root=tmp_path, llm=LLMConfig(mock_mode=True, mock_response="wiki-only"))
     monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.load_pages", lambda _wiki_dir: [])
     monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.retrieve_wiki_pages", lambda pages, query, top_k: [])
-    (paths.wiki_dir / "snapshot.json").write_text('{"snapshot_id": "sha256:wiki-test"}', encoding="utf-8")
+    (paths.raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
+    snapshot = fingerprint_document_batch(load_source_documents(paths.raw_dir))
+    (paths.wiki_dir / "snapshot.json").write_text(
+        json.dumps(
+            {
+                "snapshot_id": snapshot,
+                "execution_fingerprint": compute_execution_fingerprint(config=config, system="wiki"),
+            }
+        ),
+        encoding="utf-8",
+    )
 
     results = run_wiki_queries(config=config, paths=paths, query_cases=[QueryCase(query_id="q1", question="Q?")])
 
@@ -70,7 +96,7 @@ def test_benchmark_wiki_query_path_has_no_fallback_behavior(monkeypatch, tmp_pat
     assert results[0].mode == "wiki"
     assert results[0].answer == "wiki-only"
     metadata = (Path(results[0].artifact_dir) / "metadata.json").read_text(encoding="utf-8")
-    assert '"corpus_snapshot": "sha256:wiki-test"' in metadata
+    assert f'"corpus_snapshot": "{snapshot}"' in metadata
 
 
 def test_run_wiki_queries_signature_has_no_fallback_parameter():
@@ -90,10 +116,7 @@ def test_run_rag_queries_signature_has_no_snapshot_override_parameter():
 
 
 def test_retrieval_top_k_uses_shared_rag_budget():
-    config = AppConfig(
-        rag=RAGConfig(top_k=5),
-        benchmark=BenchmarkConfig(locked=True),
-    )
+    config = AppConfig(rag=RAGConfig(top_k=5))
     assert config.retrieval_top_k() == 5
 
 
@@ -108,6 +131,7 @@ def test_wiki_ingest_writes_canonical_snapshot_identity(monkeypatch, tmp_path):
 
     payload = (paths.wiki_dir / "snapshot.json").read_text(encoding="utf-8")
     assert '"snapshot_id": "sha256:' in payload
+    assert '"execution_fingerprint": "sha256:' in payload
 
 
 def test_snapshot_fingerprint_is_content_based_across_different_roots(tmp_path):
@@ -215,3 +239,73 @@ def test_empty_raw_files_change_snapshot_identity(tmp_path):
     snapshot_b = fingerprint_document_batch(load_source_documents(root_b))
 
     assert snapshot_a != snapshot_b
+
+
+def test_execution_fingerprint_changes_when_chunking_changes_but_snapshot_stays_same(tmp_path):
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    (raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
+    snapshot_a = fingerprint_document_batch(load_source_documents(raw_dir))
+    snapshot_b = fingerprint_document_batch(load_source_documents(raw_dir))
+    config_a = AppConfig(project_root=tmp_path, rag=RAGConfig(chunk_size=100, chunk_overlap=10))
+    config_b = AppConfig(project_root=tmp_path, rag=RAGConfig(chunk_size=120, chunk_overlap=10))
+
+    assert snapshot_a == snapshot_b
+    assert compute_execution_fingerprint(config=config_a, system="rag") != compute_execution_fingerprint(
+        config=config_b, system="rag"
+    )
+
+
+def test_rag_query_fails_if_raw_corpus_drifted_since_index_build(monkeypatch, tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    config = AppConfig(project_root=tmp_path, llm=LLMConfig(mock_mode=True, mock_response="ok"))
+    (paths.raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
+    snapshot = fingerprint_document_batch(load_source_documents(paths.raw_dir))
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "snapshot_id": snapshot,
+                "execution_fingerprint": compute_execution_fingerprint(config=config, system="rag"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.pipeline.load_index", lambda _artifacts_dir: object())
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.pipeline.retrieve_top_k", lambda **_kwargs: [])
+    (paths.raw_dir / "001_doc.txt").write_text("beta", encoding="utf-8")
+
+    try:
+        run_rag_queries(config=config, paths=paths, query_cases=[QueryCase(query_id="q1", question="Q?")])
+    except ValueError as exc:
+        assert "Raw corpus snapshot drift detected" in str(exc)
+    else:
+        raise AssertionError("Expected RAG queries to fail when raw corpus drift is detected.")
+
+
+def test_wiki_query_fails_if_raw_corpus_drifted_since_ingest(monkeypatch, tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    config = AppConfig(project_root=tmp_path, llm=LLMConfig(mock_mode=True, mock_response="ok"))
+    (paths.raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
+    snapshot = fingerprint_document_batch(load_source_documents(paths.raw_dir))
+    (paths.wiki_dir / "snapshot.json").write_text(
+        json.dumps(
+            {
+                "snapshot_id": snapshot,
+                "execution_fingerprint": compute_execution_fingerprint(config=config, system="wiki"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.load_pages", lambda _wiki_dir: [])
+    monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.retrieve_wiki_pages", lambda pages, query, top_k: [])
+    (paths.raw_dir / "001_doc.txt").write_text("beta", encoding="utf-8")
+
+    try:
+        run_wiki_queries(config=config, paths=paths, query_cases=[QueryCase(query_id="q1", question="Q?")])
+    except ValueError as exc:
+        assert "Raw corpus snapshot drift detected" in str(exc)
+    else:
+        raise AssertionError("Expected Wiki queries to fail when raw corpus drift is detected.")

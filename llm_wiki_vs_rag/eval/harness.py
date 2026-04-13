@@ -168,6 +168,9 @@ def run_queries_for_system(
     snapshot_identity = str(manifest_payload.get("snapshot_id", "")).strip()
     if not snapshot_identity:
         raise ValueError(f"Missing snapshot_id in canonical snapshot manifest for {system}.")
+    execution_fingerprint = str(manifest_payload.get("execution_fingerprint", "")).strip()
+    if not execution_fingerprint:
+        raise ValueError(f"Missing execution_fingerprint in canonical snapshot manifest for {system}.")
     corpus_order = str(manifest_payload.get("corpus_order", "")).strip() or None
 
     if system == "rag":
@@ -224,6 +227,18 @@ def run_queries_for_system(
                 "Run snapshot attribution mismatch: "
                 f"system={system}, expected={snapshot_identity}, artifact={artifact_snapshot}, path={metadata_path}."
             )
+        artifact_execution_fingerprint = str(payload.get("execution_fingerprint", "")).strip()
+        if not artifact_execution_fingerprint:
+            raise ValueError(
+                "Missing execution_fingerprint in per-query artifact metadata: "
+                f"system={system}, query_id={result.query_id}, run_id={result.run_id}, path={metadata_path}."
+            )
+        if artifact_execution_fingerprint != execution_fingerprint:
+            raise ValueError(
+                "Run execution attribution mismatch: "
+                f"system={system}, expected={execution_fingerprint}, artifact={artifact_execution_fingerprint}, "
+                f"path={metadata_path}."
+            )
     if len(seen_artifact_snapshots) > 1:
         raise ValueError(
             "Run snapshot attribution mismatch: mixed corpus snapshots observed in per-query artifacts for "
@@ -259,6 +274,7 @@ def run_queries_for_system(
                     "used_context_ids": result.used_context_ids,
                     "artifact_dir": result.artifact_dir,
                     "corpus_snapshot": snapshot_identity,
+                    "execution_fingerprint": execution_fingerprint,
                     "corpus_order": corpus_order,
                 },
             )

@@ -26,24 +26,11 @@ class RAGConfig(BaseModel):
     top_k: int = Field(default=5, ge=1)
 
 
-class WikiConfig(BaseModel):
-    """Configuration for ingest-time synthesis (LLM Wiki)."""
-    pass
-
-
-class BenchmarkConfig(BaseModel):
-    """Configuration for locked benchmark contract behavior."""
-
-    locked: bool = True
-
-
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
     project_root: Path = Field(default_factory=lambda: Path.cwd())
     rag: RAGConfig = Field(default_factory=RAGConfig)
-    wiki: WikiConfig = Field(default_factory=WikiConfig)
-    benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
 
     def retrieval_top_k(self) -> int:
