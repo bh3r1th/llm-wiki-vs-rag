@@ -88,6 +88,44 @@ def test_metric_aggregation_and_drift():
     assert drifts[0].accuracy_correct_rate_delta == -1.0
 
 
+def test_contradiction_resolved_pct_uses_only_detected_rows():
+    labels_csv = "\n".join([
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+        "rag,q1,phase_1,correct,full,correct,true,true,none,true,",
+        "rag,q2,phase_1,correct,full,correct,false,false,none,true,",
+    ])
+    outputs = [
+        RunOutputRecord(query_id="q1", system="rag", phase="phase_1", question="Q1", category="policy", answer="A1"),
+        RunOutputRecord(query_id="q2", system="rag", phase="phase_1", question="Q2", category="policy", answer="A2"),
+    ]
+    from tempfile import NamedTemporaryFile
+    with NamedTemporaryFile("w+", suffix=".csv") as tmp:
+        tmp.write(labels_csv)
+        tmp.flush()
+        records = merge_outputs_with_labels(outputs, load_manual_labels(Path(tmp.name)))
+
+    by_system = summarize_records(records, group_fields=("system",))
+    assert by_system[0].metrics["contradiction"]["resolved_pct"] == 100.0
+
+
+def test_contradiction_resolved_pct_is_not_applicable_when_no_detected_rows():
+    labels_csv = "\n".join([
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+        "rag,q1,phase_1,correct,full,correct,false,false,none,true,",
+    ])
+    outputs = [
+        RunOutputRecord(query_id="q1", system="rag", phase="phase_1", question="Q1", category="policy", answer="A1"),
+    ]
+    from tempfile import NamedTemporaryFile
+    with NamedTemporaryFile("w+", suffix=".csv") as tmp:
+        tmp.write(labels_csv)
+        tmp.flush()
+        records = merge_outputs_with_labels(outputs, load_manual_labels(Path(tmp.name)))
+
+    by_system = summarize_records(records, group_fields=("system",))
+    assert by_system[0].metrics["contradiction"]["resolved_pct"] is None
+
+
 def test_report_file_generation(tmp_path):
     labels_path = tmp_path / "labels.csv"
     with labels_path.open("w", encoding="utf-8", newline="") as handle:
@@ -121,6 +159,38 @@ def test_report_file_generation(tmp_path):
 
     summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
     assert "summaries_by_system" in summary
+
+def test_report_outputs_na_for_contradiction_pct_when_not_applicable(tmp_path):
+    labels_path = tmp_path / "labels.csv"
+    labels_path.write_text(
+        "\n".join(
+            [
+                "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "rag,q1,phase_1,correct,full,correct,false,false,none,true,",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    records = merge_outputs_with_labels(
+        [
+            RunOutputRecord(
+                query_id="q1",
+                system="rag",
+                phase="phase_1",
+                question="Q1",
+                category="policy",
+                answer="A1",
+            )
+        ],
+        load_manual_labels(labels_path),
+    )
+    output_dir = tmp_path / "report"
+    write_reports(records, output_dir)
+
+    summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["summaries_by_system"][0]["metrics"]["contradiction"]["resolved_pct"] is None
+    assert "N/A" in (output_dir / "summary.csv").read_text(encoding="utf-8")
+    assert "N/A" in (output_dir / "report.md").read_text(encoding="utf-8")
 
 
 def test_merge_uses_system_plus_query_id_plus_phase_for_labels():
@@ -220,6 +290,7 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
     assert [record.prompt_tokens for record in records] == [3, 5]
     assert [record.completion_tokens for record in records] == [4, 6]
     assert [record.total_tokens for record in records] == [7, 11]
+    assert all(record.metadata.get("corpus_snapshot") for record in records)
 
 
 def load_query_case(query_id: str, question: str):
@@ -291,6 +362,29 @@ def test_same_query_id_across_phases_keeps_distinct_labels():
     by_phase = {record.phase: record for record in records}
     assert by_phase["phase_1"].accuracy == "correct"
     assert by_phase["phase_2"].accuracy == "wrong"
+
+
+def test_drift_contradiction_resolved_uses_detected_denominator_only():
+    outputs = [
+        RunOutputRecord(query_id="q1", system="rag", phase="phase_1", question="Q1", category="policy", answer="A1"),
+        RunOutputRecord(query_id="q2", system="rag", phase="phase_1", question="Q2", category="policy", answer="A2"),
+        RunOutputRecord(query_id="q3", system="rag", phase="phase_2", question="Q3", category="policy", answer="A3"),
+        RunOutputRecord(query_id="q4", system="rag", phase="phase_2", question="Q4", category="policy", answer="A4"),
+    ]
+    labels = load_manual_labels_from_text(
+        "\n".join(
+            [
+                "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "rag,q1,phase_1,correct,full,correct,true,true,none,true,",
+                "rag,q2,phase_1,correct,full,correct,false,false,none,true,",
+                "rag,q3,phase_2,correct,full,correct,true,false,none,true,",
+                "rag,q4,phase_2,correct,full,correct,false,false,none,true,",
+            ]
+        )
+    )
+    records = merge_outputs_with_labels(outputs, labels)
+    drifts = compute_drift(records)
+    assert drifts[0].contradiction_resolved_rate_delta == -1.0
 
 
 def test_load_manual_labels_fails_when_phase_missing(tmp_path):

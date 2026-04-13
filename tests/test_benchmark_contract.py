@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import inspect
+
 from llm_wiki_vs_rag.config import AppConfig, BenchmarkConfig, LLMConfig, RAGConfig, WikiConfig
 from llm_wiki_vs_rag.models import QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
@@ -46,20 +48,6 @@ def test_wiki_query_prompt_has_refusal_and_latest_state_guards():
     assert "Do not invent latest-state, current-status, or time-sensitive claims" in prompt
 
 
-def test_benchmark_wiki_query_path_rejects_fallback_flag(monkeypatch, tmp_path):
-    paths = ProjectPaths(project_root=tmp_path)
-    paths.ensure()
-    config = AppConfig(project_root=tmp_path, llm=LLMConfig(mock_mode=True, mock_response="wiki answer"))
-    monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.load_pages", lambda _wiki_dir: [])
-    monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.retrieve_wiki_pages", lambda pages, query, top_k: [])
-    try:
-        run_wiki_queries(config=config, paths=paths, query_cases=[QueryCase(query_id="q1", question="Q?")], use_rag_fallback=True)
-    except ValueError as exc:
-        assert "wiki-only" in str(exc)
-    else:
-        raise AssertionError("Expected wiki query benchmark path to reject fallback.")
-
-
 def test_benchmark_wiki_query_path_has_no_fallback_behavior(monkeypatch, tmp_path):
     paths = ProjectPaths(project_root=tmp_path)
     paths.ensure()
@@ -72,6 +60,10 @@ def test_benchmark_wiki_query_path_has_no_fallback_behavior(monkeypatch, tmp_pat
     assert len(results) == 1
     assert results[0].mode == "wiki"
     assert results[0].answer == "wiki-only"
+
+
+def test_run_wiki_queries_signature_has_no_fallback_parameter():
+    assert "use_rag_fallback" not in inspect.signature(run_wiki_queries).parameters
 
 
 def test_locked_benchmark_fails_fast_on_top_k_parity_break():

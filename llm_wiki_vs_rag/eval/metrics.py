@@ -28,8 +28,10 @@ def summarize_records(records: list[EvaluationRecord], group_fields: tuple[str, 
         latencies = [record.latency_ms for record in bucket if record.latency_ms is not None]
         total_tokens = [float(record.total_tokens) for record in bucket if record.total_tokens is not None]
 
-        metrics: dict[str, dict[str, float | int]] = {}
+        metrics: dict[str, dict[str, float | int | str | None]] = {}
         if labeled:
+            contradiction_detected_total = sum(1 for record in labeled if record.contradiction_detected)
+            contradiction_resolved_total = sum(1 for record in labeled if record.contradiction_resolved)
             accuracy_counts = {
                 "correct": sum(1 for record in labeled if record.accuracy == "correct"),
                 "partial": sum(1 for record in labeled if record.accuracy == "partial"),
@@ -57,11 +59,13 @@ def summarize_records(records: list[EvaluationRecord], group_fields: tuple[str, 
                     "correct_pct": _pct(latest_counts["correct"], len(labeled)),
                 },
                 "contradiction": {
-                    "detected": sum(1 for record in labeled if record.contradiction_detected),
-                    "resolved": sum(1 for record in labeled if record.contradiction_resolved),
-                    "resolved_pct": _pct(
-                        sum(1 for record in labeled if record.contradiction_resolved),
-                        len(labeled),
+                    "detected": contradiction_detected_total,
+                    "resolved": contradiction_resolved_total,
+                    "resolved_applicable_total": contradiction_detected_total,
+                    "resolved_pct": (
+                        _pct(contradiction_resolved_total, contradiction_detected_total)
+                        if contradiction_detected_total
+                        else None
                     ),
                 },
                 "compression_loss": {
@@ -104,17 +108,43 @@ def compute_drift(records: list[EvaluationRecord]) -> list[DriftSummary]:
         phase_1 = [record for record in bucket if record.phase == "phase_1"]
         phase_2 = [record for record in bucket if record.phase == "phase_2"]
 
-        def rate(items: list[EvaluationRecord], attr: str, expected: str | bool) -> float | None:
-            if not items:
+        def rate(
+            items: list[EvaluationRecord],
+            attr: str,
+            expected: str | bool,
+            *,
+            denominator_filter_attr: str | None = None,
+            denominator_filter_value: str | bool | None = None,
+        ) -> float | None:
+            denominator_items = items
+            if denominator_filter_attr is not None:
+                denominator_items = [
+                    item
+                    for item in items
+                    if getattr(item, denominator_filter_attr) == denominator_filter_value
+                ]
+            if not denominator_items:
                 return None
-            return round(sum(1 for item in items if getattr(item, attr) == expected) / len(items), 4)
+            return round(sum(1 for item in denominator_items if getattr(item, attr) == expected) / len(denominator_items), 4)
 
         p1_accuracy = rate(phase_1, "accuracy", "correct")
         p2_accuracy = rate(phase_2, "accuracy", "correct")
         p1_latest = rate(phase_1, "latest_state", "correct")
         p2_latest = rate(phase_2, "latest_state", "correct")
-        p1_resolved = rate(phase_1, "contradiction_resolved", True)
-        p2_resolved = rate(phase_2, "contradiction_resolved", True)
+        p1_resolved = rate(
+            phase_1,
+            "contradiction_resolved",
+            True,
+            denominator_filter_attr="contradiction_detected",
+            denominator_filter_value=True,
+        )
+        p2_resolved = rate(
+            phase_2,
+            "contradiction_resolved",
+            True,
+            denominator_filter_attr="contradiction_detected",
+            denominator_filter_value=True,
+        )
 
         drifts.append(
             DriftSummary(

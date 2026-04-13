@@ -14,6 +14,35 @@ from llm_wiki_vs_rag.rag.pipeline import run_rag_queries
 from llm_wiki_vs_rag.wiki.pipeline import run_wiki_queries
 
 
+def resolve_corpus_snapshot_identity(paths: ProjectPaths, system: str) -> str:
+    """Resolve a concrete corpus snapshot identifier for benchmark run outputs."""
+    if system == "rag":
+        base_path = paths.artifacts_dir / "rag_index.json"
+        manifest_candidates = [
+            paths.artifacts_dir / "rag_index.snapshot.json",
+            paths.artifacts_dir / "rag_index.manifest.json",
+            paths.artifacts_dir / "manifest.json",
+        ]
+    elif system == "wiki":
+        base_path = paths.wiki_dir
+        manifest_candidates = [
+            paths.wiki_dir / "snapshot.json",
+            paths.wiki_dir / "manifest.json",
+        ]
+    else:
+        raise ValueError(f"Unsupported system for snapshot resolution: {system}")
+
+    for manifest_path in manifest_candidates:
+        if not manifest_path.exists():
+            continue
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            snapshot_id = payload.get("snapshot_id") or payload.get("id") or payload.get("snapshot")
+            if snapshot_id:
+                return str(snapshot_id)
+    return str(base_path.resolve())
+
+
 def load_query_cases(path: Path) -> list[EvalQueryCase]:
     """Load evaluation query cases from JSON or JSONL."""
     if path.suffix == ".jsonl":
@@ -69,6 +98,7 @@ def run_queries_for_system(
 ) -> list[RunOutputRecord]:
     """Run one system over a query set and normalize outputs."""
     query_inputs = [QueryCase(query_id=case.query_id, question=case.question) for case in query_cases]
+    snapshot_identity = resolve_corpus_snapshot_identity(paths=paths, system=system)
 
     if system == "rag":
         results = run_rag_queries(config=config, paths=paths, query_cases=query_inputs)
@@ -98,6 +128,7 @@ def run_queries_for_system(
                 metadata={
                     "used_context_ids": result.used_context_ids,
                     "artifact_dir": result.artifact_dir,
+                    "corpus_snapshot": snapshot_identity,
                 },
             )
         )
