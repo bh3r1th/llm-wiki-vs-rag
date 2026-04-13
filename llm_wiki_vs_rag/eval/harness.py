@@ -315,10 +315,30 @@ def load_run_outputs(path: Path) -> list[RunOutputRecord]:
     """Load normalized run outputs from JSONL or JSON."""
     if path.suffix == ".jsonl":
         lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        return [RunOutputRecord.model_validate(json.loads(line)) for line in lines]
+        records = [RunOutputRecord.model_validate(json.loads(line)) for line in lines]
+    else:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        records = [RunOutputRecord.model_validate(item) for item in payload]
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    return [RunOutputRecord.model_validate(item) for item in payload]
+    missing_execution_fingerprint_rows: list[dict[str, str | int]] = []
+    for row_index, record in enumerate(records):
+        execution_fingerprint = str(record.metadata.get("execution_fingerprint", "")).strip()
+        if execution_fingerprint:
+            continue
+        missing_execution_fingerprint_rows.append(
+            {
+                "row_index": row_index,
+                "query_id": record.query_id,
+                "system": record.system,
+                "phase": record.phase,
+            }
+        )
+    if missing_execution_fingerprint_rows:
+        raise ValueError(
+            "Run outputs must include metadata.execution_fingerprint for every row. "
+            f"missing_sample={missing_execution_fingerprint_rows[:5]}."
+        )
+    return records
 
 
 def merge_outputs_with_labels(
