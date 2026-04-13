@@ -55,6 +55,10 @@ def build_parser() -> argparse.ArgumentParser:
     compare_parser.add_argument("--labels-file", type=Path, required=True)
     compare_parser.add_argument("--output-dir", type=Path)
 
+    label_template_parser = subparsers.add_parser("make-label-template")
+    label_template_parser.add_argument("--run-file", type=Path, required=True)
+    label_template_parser.add_argument("--output-file", type=Path, required=True)
+
     return parser
 
 

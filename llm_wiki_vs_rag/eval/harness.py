@@ -610,3 +610,79 @@ def merge_outputs_with_labels(
             )
         )
     return records
+
+
+def write_manual_label_template_from_run_outputs(
+    run_outputs: list[RunOutputRecord],
+    output_path: Path,
+) -> None:
+    """Write CSV label template rows from validated run outputs."""
+    fieldnames = [
+        "system",
+        "query_id",
+        "phase",
+        "category",
+        "question",
+        "answer",
+        "corpus_snapshot",
+        "execution_fingerprint",
+        "accuracy",
+        "synthesis",
+        "latest_state",
+        "contradiction_detected",
+        "contradiction_resolved",
+        "compression_loss",
+        "provenance_fidelity",
+        "evaluator_notes",
+    ]
+    seen_identities: set[tuple[str, str, str]] = set()
+    duplicate_identities: list[tuple[str, str, str]] = []
+    rows: list[dict[str, str]] = []
+    for record in run_outputs:
+        identity = (record.system, record.query_id, record.phase)
+        if identity in seen_identities:
+            duplicate_identities.append(identity)
+            continue
+        seen_identities.add(identity)
+        corpus_snapshot = str(record.metadata.get("corpus_snapshot", "")).strip()
+        execution_fingerprint = str(record.metadata.get("execution_fingerprint", "")).strip()
+        if not corpus_snapshot or not execution_fingerprint:
+            raise ValueError(
+                "Run outputs for manual label template must include metadata.corpus_snapshot and "
+                "metadata.execution_fingerprint for every row. "
+                f"system={record.system}, query_id={record.query_id}, phase={record.phase}."
+            )
+        rows.append(
+            {
+                "system": record.system,
+                "query_id": record.query_id,
+                "phase": record.phase,
+                "category": record.category,
+                "question": record.question,
+                "answer": record.answer,
+                "corpus_snapshot": corpus_snapshot,
+                "execution_fingerprint": execution_fingerprint,
+                "accuracy": "",
+                "synthesis": "",
+                "latest_state": "",
+                "contradiction_detected": "",
+                "contradiction_resolved": "",
+                "compression_loss": "",
+                "provenance_fidelity": "",
+                "evaluator_notes": "",
+            }
+        )
+    if duplicate_identities:
+        sample = [
+            {"system": system, "query_id": query_id, "phase": phase}
+            for system, query_id, phase in duplicate_identities[:5]
+        ]
+        raise ValueError(
+            "Manual label template generation requires unique run output rows per (system, query_id, phase). "
+            f"duplicate_sample={sample}."
+        )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
