@@ -7,11 +7,18 @@ from pathlib import Path
 
 from llm_wiki_vs_rag.config import AppConfig
 from llm_wiki_vs_rag.eval.harness import (
+    build_smoke_query_subset,
     load_manual_labels,
+    load_phase_query_cases,
     load_query_cases,
     load_run_outputs,
     merge_outputs_with_labels,
+    run_phase_1_rag_queries,
+    run_phase_1_wiki_queries,
+    run_phase_2_rag_queries,
+    run_phase_2_wiki_queries,
     run_queries_for_system,
+    save_query_cases,
     save_run_outputs,
 )
 from llm_wiki_vs_rag.eval.report import write_reports
@@ -249,6 +256,31 @@ def _validate_system_purity(outputs, expected_system: str, context: str) -> None
         )
 
 
+def _run_phase_specific_benchmark(
+    *,
+    config: AppConfig,
+    paths: ProjectPaths,
+    query_file: Path,
+    output_file: Path,
+    system: str,
+    phase: str | None,
+) -> None:
+    if phase is None:
+        raise ValueError("benchmark-phase-run requires explicit --phase.")
+    query_cases = load_phase_query_cases(query_file, phase)
+    if system == "rag" and phase == "phase_1":
+        records = run_phase_1_rag_queries(config=config, paths=paths, query_cases=query_cases)
+    elif system == "rag" and phase == "phase_2":
+        records = run_phase_2_rag_queries(config=config, paths=paths, query_cases=query_cases)
+    elif system == "wiki" and phase == "phase_1":
+        records = run_phase_1_wiki_queries(config=config, paths=paths, query_cases=query_cases)
+    elif system == "wiki" and phase == "phase_2":
+        records = run_phase_2_wiki_queries(config=config, paths=paths, query_cases=query_cases)
+    else:
+        raise ValueError(f"Unsupported phase/system combination: system={system}, phase={phase}.")
+    save_run_outputs(records, output_file)
+
+
 def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     """Dispatch supported runner commands to pipeline entry points."""
     paths = ProjectPaths(config.project_root)
@@ -275,6 +307,25 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
                 target_phase=phase,
             ),
             output_file,
+        )
+    elif command == "smoke-queries":
+        query_file = Path(str(kwargs["query_file"]))
+        output_file = Path(str(kwargs.get("output_file") or paths.artifacts_dir / "smoke_queries.jsonl"))
+        query_cases = load_query_cases(query_file)
+        save_query_cases(build_smoke_query_subset(query_cases=query_cases), output_file)
+    elif command == "benchmark-phase-run":
+        _validate_benchmark_llm_config(config)
+        query_file = Path(str(kwargs["query_file"]))
+        output_file = Path(str(kwargs.get("output_file") or paths.artifacts_dir / "benchmark-phase-run.jsonl"))
+        system = str(kwargs["system"])
+        phase = str(kwargs["phase"]) if kwargs.get("phase") is not None else None
+        _run_phase_specific_benchmark(
+            config=config,
+            paths=paths,
+            query_file=query_file,
+            output_file=output_file,
+            system=system,
+            phase=phase,
         )
     elif command == "validate-queries":
         query_file = Path(str(kwargs["query_file"]))
