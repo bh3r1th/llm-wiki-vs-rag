@@ -43,41 +43,52 @@ def ingest_one_document(
     selected_pages = retrieve_wiki_pages(pages=current_pages, query=document.text, top_k=5)
 
     prompt = build_ingest_prompt(document=document, selected_pages=selected_pages)
+    ingest_artifact_dir = paths.artifacts_dir / "wiki_ingest" / ingest_run_id / document.doc_id
+    ingest_artifact_dir.mkdir(parents=True, exist_ok=True)
+    _write_json(ingest_artifact_dir / "selected_pages.json", [page.title for page in selected_pages])
+    (ingest_artifact_dir / "prompt.txt").write_text(prompt, encoding="utf-8")
+
     llm_raw = llm_client.generate_json(prompt)
-    llm_output = coerce_ingest_output(raw_output=llm_raw, document=document)
+    _write_json(ingest_artifact_dir / "llm_raw_output.json", llm_raw)
+    try:
+        llm_output = coerce_ingest_output(raw_output=llm_raw, document=document)
+    except ValueError as exc:
+        _write_json(
+            ingest_artifact_dir / "ingest_failure.json",
+            {
+                "timestamp": timestamp,
+                "ingest_run_id": ingest_run_id,
+                "corpus_snapshot": corpus_snapshot,
+                "doc_id": document.doc_id,
+                "error": str(exc),
+            },
+        )
+        raise
 
     created_titles: list[str] = []
     updated_titles: list[str] = []
 
     for entry in llm_output["pages_to_create"]:
-        title = str(entry.get("title", "")).strip() or document.doc_id
-        summary = str(entry.get("summary", "")).strip() or f"Facts from {document.doc_id}."
-        content = str(entry.get("content", "")).strip() or document.text
         create_page(
             wiki_dir=paths.wiki_dir,
-            title=title,
-            summary=summary,
-            content=content,
+            title=entry["title"],
+            summary=entry["summary"],
+            content=entry["content"],
             timestamp=timestamp,
             doc_id=document.doc_id,
         )
-        created_titles.append(title)
+        created_titles.append(entry["title"])
 
     for entry in llm_output["pages_to_update"]:
-        title = str(entry.get("title", "")).strip()
-        if not title:
-            continue
-        content = str(entry.get("content", "")).strip() or document.text
-        change_note = str(entry.get("change_note", "")).strip() or "Updated from new source information."
         update_page_non_destructive(
             wiki_dir=paths.wiki_dir,
-            title=title,
-            content=content,
-            change_note=change_note,
+            title=entry["title"],
+            content=entry["content"],
+            change_note=entry["change_note"],
             timestamp=timestamp,
             doc_id=document.doc_id,
         )
-        updated_titles.append(title)
+        updated_titles.append(entry["title"])
 
     all_pages = load_pages(paths.wiki_dir)
     rebuild_index(index_path=paths.index_md, pages=all_pages, index_note=llm_output["index_note"])
@@ -90,10 +101,6 @@ def ingest_one_document(
         log_note=llm_output["log_note"],
     )
 
-    ingest_artifact_dir = paths.artifacts_dir / "wiki_ingest" / ingest_run_id / document.doc_id
-    ingest_artifact_dir.mkdir(parents=True, exist_ok=True)
-    _write_json(ingest_artifact_dir / "selected_pages.json", [page.title for page in selected_pages])
-    (ingest_artifact_dir / "prompt.txt").write_text(prompt, encoding="utf-8")
     _write_json(ingest_artifact_dir / "llm_output.json", llm_output)
     _write_json(
         ingest_artifact_dir / "applied_changes.json",

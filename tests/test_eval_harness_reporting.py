@@ -409,6 +409,58 @@ def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monke
     assert [record.category for record in records] == ["policy", "history"]
 
 
+def test_run_queries_for_system_fails_on_mixed_phases_without_explicit_phase_binding(tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": "sha256:canonical-snapshot"}),
+        encoding="utf-8",
+    )
+    try:
+        run_queries_for_system(
+            config=AppConfig(project_root=tmp_path),
+            paths=paths,
+            query_cases=[
+                EvalQueryCase(query_id="q1", question="Q1", category="policy", phase="phase_1"),
+                EvalQueryCase(query_id="q2", question="Q2", category="policy", phase="phase_2"),
+            ],
+            system="rag",
+        )
+    except ValueError as exc:
+        assert "Mixed-phase query execution is not allowed without explicit phase binding" in str(exc)
+    else:
+        raise AssertionError("Expected mixed-phase query invocation without explicit phase binding to fail.")
+
+
+def test_run_queries_for_system_accepts_explicit_phase_and_snapshot_binding(monkeypatch, tmp_path):
+    artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:phase-2-snapshot"}), encoding="utf-8")
+    monkeypatch.setattr(
+        "llm_wiki_vs_rag.eval.harness.run_rag_queries",
+        lambda **_kwargs: [
+            GenerationResult(query_id="q2::phase=phase_2", answer="a2", mode="rag", artifact_dir=str(artifact_dir)),
+        ],
+    )
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    records = run_queries_for_system(
+        config=AppConfig(project_root=tmp_path),
+        paths=paths,
+        query_cases=[
+            EvalQueryCase(query_id="q1", question="Q1", category="policy", phase="phase_1"),
+            EvalQueryCase(query_id="q2", question="Q2", category="history", phase="phase_2"),
+        ],
+        system="rag",
+        target_phase="phase_2",
+        snapshot_id="sha256:phase-2-snapshot",
+    )
+    assert len(records) == 1
+    assert records[0].phase == "phase_2"
+    assert records[0].metadata.get("corpus_snapshot") == "sha256:phase-2-snapshot"
+
+
 def test_run_queries_normalization_is_order_independent(monkeypatch, tmp_path):
     artifact_one = tmp_path / "art" / "reordered-1"
     artifact_two = tmp_path / "art" / "reordered-2"

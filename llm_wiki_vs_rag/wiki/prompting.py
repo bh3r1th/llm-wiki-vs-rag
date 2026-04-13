@@ -37,29 +37,56 @@ def build_ingest_prompt(document: SourceDocument, selected_pages: list[PageRecor
 
 
 def coerce_ingest_output(raw_output: dict, document: SourceDocument) -> dict:
-    """Coerce LLM JSON output into expected strict structure with safe fallback."""
-    pages_to_create = raw_output.get("pages_to_create") if isinstance(raw_output, dict) else None
-    pages_to_update = raw_output.get("pages_to_update") if isinstance(raw_output, dict) else None
+    """Coerce LLM JSON output into expected strict structure with strict validation."""
+    if not isinstance(raw_output, dict):
+        raise ValueError(f"Ingest model output must be a JSON object for doc_id={document.doc_id}.")
+    pages_to_create = raw_output.get("pages_to_create")
+    pages_to_update = raw_output.get("pages_to_update")
+    if not isinstance(pages_to_create, list) or not isinstance(pages_to_update, list):
+        raise ValueError(
+            f"Ingest model output must include list fields pages_to_create/pages_to_update for doc_id={document.doc_id}."
+        )
 
-    if not isinstance(pages_to_create, list):
-        pages_to_create = []
-    if not isinstance(pages_to_update, list):
-        pages_to_update = []
+    normalized_create: list[dict[str, str]] = []
+    for entry in pages_to_create:
+        if not isinstance(entry, dict):
+            raise ValueError(f"Invalid pages_to_create entry type for doc_id={document.doc_id}.")
+        title = str(entry.get("title", "")).strip()
+        summary = str(entry.get("summary", "")).strip()
+        content = str(entry.get("content", "")).strip()
+        if not title or not summary or not content:
+            raise ValueError(
+                f"Invalid pages_to_create entry: title, summary, and content are required for doc_id={document.doc_id}."
+            )
+        normalized_create.append({"title": title, "summary": summary, "content": content})
 
-    if not pages_to_create and not pages_to_update:
-        pages_to_create = [
+    normalized_update: list[dict[str, str]] = []
+    for entry in pages_to_update:
+        if not isinstance(entry, dict):
+            raise ValueError(f"Invalid pages_to_update entry type for doc_id={document.doc_id}.")
+        title = str(entry.get("title", "")).strip()
+        content = str(entry.get("content", "")).strip()
+        change_note = str(entry.get("change_note", "")).strip()
+        if not title or not content:
+            raise ValueError(
+                f"Invalid pages_to_update entry: title and content are required for doc_id={document.doc_id}."
+            )
+        normalized_update.append(
             {
-                "title": document.doc_id.replace("_", " ").title(),
-                "summary": f"Facts synthesized from raw source {document.doc_id}.",
-                "content": document.text,
+                "title": title,
+                "content": content,
+                "change_note": change_note or "Updated from new source information.",
             }
-        ]
+        )
+
+    if not normalized_create and not normalized_update:
+        raise ValueError(f"Ingest model output is empty for doc_id={document.doc_id}; no wiki changes proposed.")
 
     return {
-        "pages_to_create": pages_to_create,
-        "pages_to_update": pages_to_update,
-        "index_note": (raw_output.get("index_note") if isinstance(raw_output, dict) else "") or "",
-        "log_note": (raw_output.get("log_note") if isinstance(raw_output, dict) else "") or "",
+        "pages_to_create": normalized_create,
+        "pages_to_update": normalized_update,
+        "index_note": str(raw_output.get("index_note", "")).strip(),
+        "log_note": str(raw_output.get("log_note", "")).strip(),
     }
 
 

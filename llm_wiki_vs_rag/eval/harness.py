@@ -133,12 +133,30 @@ def run_queries_for_system(
     paths: ProjectPaths,
     query_cases: list[EvalQueryCase],
     system: str,
+    target_phase: str | None = None,
+    snapshot_id: str | None = None,
 ) -> list[RunOutputRecord]:
     """Run one system over a query set and normalize outputs."""
+    phases_present = {case.phase for case in query_cases}
+    if target_phase is None and len(phases_present) > 1:
+        raise ValueError(
+            "Mixed-phase query execution is not allowed without explicit phase binding. "
+            f"phases={sorted(phases_present)}."
+        )
+    effective_phase = target_phase
+    if effective_phase is None and len(phases_present) == 1:
+        effective_phase = next(iter(phases_present))
+    effective_cases = [case for case in query_cases if effective_phase is None or case.phase == effective_phase]
+    if not effective_cases:
+        raise ValueError(
+            "No query rows match requested phase binding. "
+            f"target_phase={target_phase}, phases={sorted(phases_present)}."
+        )
+
     query_identity_to_case: dict[str, EvalQueryCase] = {}
     duplicate_identities: list[str] = []
     query_inputs: list[QueryCase] = []
-    for case in query_cases:
+    for case in effective_cases:
         identity = _query_identity(case)
         if identity in query_identity_to_case:
             duplicate_identities.append(identity)
@@ -150,7 +168,7 @@ def run_queries_for_system(
             "Each query case must have a unique (query_id, phase) identity per run. "
             f"duplicate_identity_sample={duplicate_identities[:5]}"
         )
-    snapshot_identity = resolve_corpus_snapshot_identity(paths=paths, system=system)
+    snapshot_identity = snapshot_id or resolve_corpus_snapshot_identity(paths=paths, system=system)
 
     if system == "rag":
         results = run_rag_queries(
