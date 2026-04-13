@@ -12,7 +12,6 @@ from llm_wiki_vs_rag.data.load_docs import load_source_documents
 from llm_wiki_vs_rag.llm.client import LLMClient
 from llm_wiki_vs_rag.models import GenerationResult, QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
-from llm_wiki_vs_rag.rag.pipeline import answer_rag_query
 from llm_wiki_vs_rag.wiki.ingest import ingest_one_document
 from llm_wiki_vs_rag.wiki.pages import load_pages
 from llm_wiki_vs_rag.wiki.prompting import build_wiki_query_prompt
@@ -40,21 +39,17 @@ def run_wiki_queries(
     query_cases: list[QueryCase],
     use_rag_fallback: bool | None = None,
 ) -> list[GenerationResult]:
-    """Run query-time answer generation from wiki pages with optional RAG fallback."""
+    """Run query-time answer generation strictly from wiki pages."""
     pages = load_pages(paths.wiki_dir)
     llm_client = LLMClient(config=config.llm)
-
-    fallback_enabled = config.wiki_fallback_enabled(use_rag_fallback)
+    if use_rag_fallback:
+        raise ValueError("Benchmark wiki query path is wiki-only; RAG fallback is not supported in this function.")
     top_k = config.retrieval_top_k()
 
     results: list[GenerationResult] = []
     for query in query_cases:
         start = perf_counter()
         selected_pages = retrieve_wiki_pages(pages=pages, query=query.question, top_k=top_k)
-
-        if fallback_enabled and not selected_pages:
-            results.append(answer_rag_query(config=config, paths=paths, query=query))
-            continue
 
         prompt = build_wiki_query_prompt(question=query.question, pages=selected_pages)
         llm_response = llm_client.generate_response(prompt, require_token_usage=True)
@@ -76,7 +71,6 @@ def run_wiki_queries(
                     "run_id": run_id,
                     "mode": "wiki",
                     "used_context_ids": [page.slug for page in selected_pages],
-                    "fallback_to_rag": fallback_enabled,
                     "token_usage": {
                         "prompt_tokens": llm_response.token_usage.prompt_tokens,
                         "completion_tokens": llm_response.token_usage.completion_tokens,

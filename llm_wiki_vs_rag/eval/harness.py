@@ -127,6 +127,33 @@ def merge_outputs_with_labels(
     labels_by_system_query_phase: dict[tuple[str, str, str], ManualEvalLabel],
 ) -> list[EvaluationRecord]:
     """Merge system outputs with manual labels into evaluation records."""
+    missing_keys: list[tuple[str, str, str]] = []
+    for output in run_outputs:
+        key = (output.system, output.query_id, output.phase)
+        label = labels_by_system_query_phase.get(key)
+        if label is None:
+            missing_keys.append(key)
+            continue
+        if (
+            label.accuracy is None
+            or label.synthesis is None
+            or label.latest_state is None
+            or label.contradiction_detected is None
+            or label.contradiction_resolved is None
+            or label.compression_loss is None
+            or label.provenance_fidelity is None
+        ):
+            missing_keys.append(key)
+    if missing_keys:
+        sample = [
+            {"system": system, "query_id": query_id, "phase": phase}
+            for system, query_id, phase in missing_keys[:5]
+        ]
+        raise ValueError(
+            "Manual labels are required for every output row and must be complete. "
+            f"missing_or_partial_label_sample={sample}"
+        )
+
     records: list[EvaluationRecord] = []
     for output in run_outputs:
         label = labels_by_system_query_phase.get((output.system, output.query_id, output.phase))
@@ -144,14 +171,14 @@ def merge_outputs_with_labels(
                 completion_tokens=output.completion_tokens,
                 total_tokens=output.total_tokens,
                 metadata=output.metadata,
-                accuracy=label.accuracy if label else None,
-                synthesis=label.synthesis if label else None,
-                latest_state=label.latest_state if label else None,
-                contradiction_detected=label.contradiction_detected if label else None,
-                contradiction_resolved=label.contradiction_resolved if label else None,
-                compression_loss=label.compression_loss if label else None,
-                provenance_fidelity=label.provenance_fidelity if label else None,
-                evaluator_notes=label.evaluator_notes if label else "",
+                accuracy=label.accuracy,
+                synthesis=label.synthesis,
+                latest_state=label.latest_state,
+                contradiction_detected=label.contradiction_detected,
+                contradiction_resolved=label.contradiction_resolved,
+                compression_loss=label.compression_loss,
+                provenance_fidelity=label.provenance_fidelity,
+                evaluator_notes=label.evaluator_notes,
             )
         )
     return records

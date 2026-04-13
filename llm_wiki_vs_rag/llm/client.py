@@ -87,7 +87,7 @@ class LLMClient:
 
     def __init__(self, config: LLMConfig) -> None:
         self.config = config
-        self._mock_mode = config.mock_mode or config.provider.lower() == "mock"
+        self._mock_mode = config.mock_mode
 
         if self._mock_mode:
             self._adapter: _OpenAICompatibleAdapter | None = None
@@ -95,7 +95,7 @@ class LLMClient:
 
         provider = config.provider.lower()
         if provider in {"stub", "mock"}:
-            raise ValueError("Stub/mock provider is disabled outside deterministic mock_mode tests.")
+            raise ValueError("Stub/mock providers are disabled; use llm.mock_mode for deterministic tests.")
         if provider != "openai-compatible":
             raise ValueError(f"Unsupported LLM provider: {config.provider}")
 
