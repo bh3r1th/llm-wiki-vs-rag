@@ -156,6 +156,37 @@ def _validate_phase_snapshot_integrity(outputs, context: str) -> None:
         )
 
 
+def _validate_execution_fingerprint_cohort_integrity(outputs, context: str) -> None:
+    fingerprints_by_cohort: dict[tuple[str, str], set[str]] = {}
+    missing_rows: list[tuple[str, str, str]] = []
+    for record in outputs:
+        fingerprint = str(record.metadata.get("execution_fingerprint", "")).strip()
+        if not fingerprint:
+            missing_rows.append((record.system, record.query_id, record.phase))
+            continue
+        cohort = (record.system, record.phase)
+        fingerprints_by_cohort.setdefault(cohort, set()).add(fingerprint)
+    if missing_rows:
+        raise ValueError(
+            f"Missing execution_fingerprint for cohort validation in {context}. "
+            f"missing_sample={missing_rows[:5]}."
+        )
+    inconsistent = sorted(
+        {
+            "system": system,
+            "phase": phase,
+            "execution_fingerprints": sorted(values),
+        }
+        for (system, phase), values in fingerprints_by_cohort.items()
+        if len(values) != 1
+    )
+    if inconsistent:
+        raise ValueError(
+            f"Inconsistent execution_fingerprint within system/phase cohort in {context}. "
+            f"cohort_sample={inconsistent[:5]}."
+        )
+
+
 def _validate_cross_system_phase_snapshot_parity(rag_outputs, wiki_outputs) -> None:
     for phase in ("phase_1", "phase_2"):
         rag_snapshots = {
@@ -222,6 +253,7 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         expected_system = "rag" if command == "evaluate-rag" else "wiki"
         _validate_system_purity(outputs, expected_system=expected_system, context=f"{command}:{run_file}")
         _validate_phase_snapshot_integrity(outputs, context=f"{command}:{run_file}")
+        _validate_execution_fingerprint_cohort_integrity(outputs, context=f"{command}:{run_file}")
         labels = load_manual_labels(labels_file)
         records = merge_outputs_with_labels(outputs, labels)
         write_reports(records=records, output_dir=output_dir)
@@ -236,6 +268,8 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         _validate_system_purity(wiki_outputs, expected_system="wiki", context=f"compare-systems wiki:{wiki_run_file}")
         _validate_phase_snapshot_integrity(rag_outputs, context=f"compare-systems rag:{rag_run_file}")
         _validate_phase_snapshot_integrity(wiki_outputs, context=f"compare-systems wiki:{wiki_run_file}")
+        _validate_execution_fingerprint_cohort_integrity(rag_outputs, context=f"compare-systems rag:{rag_run_file}")
+        _validate_execution_fingerprint_cohort_integrity(wiki_outputs, context=f"compare-systems wiki:{wiki_run_file}")
         _validate_system_uniqueness(rag_outputs, "rag")
         _validate_system_uniqueness(wiki_outputs, "wiki")
         _validate_cross_system_phase_snapshot_parity(rag_outputs, wiki_outputs)
