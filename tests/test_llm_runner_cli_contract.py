@@ -525,7 +525,7 @@ def test_compare_systems_fails_when_phase_snapshot_mapping_inconsistent(tmp_path
                 "question": "Q1",
                 "category": "policy",
                 "answer": "A1",
-                "metadata": {"corpus_snapshot": "rag-phase-1"},
+                "metadata": {"corpus_snapshot": "rag-phase-1", "corpus_order": "001"},
             }
         )
         + "\n"
@@ -537,7 +537,7 @@ def test_compare_systems_fails_when_phase_snapshot_mapping_inconsistent(tmp_path
                 "question": "Q2",
                 "category": "policy",
                 "answer": "A2",
-                "metadata": {"corpus_snapshot": "rag-phase-1"},
+                "metadata": {"corpus_snapshot": "rag-phase-1", "corpus_order": "002"},
             }
         )
         + "\n",
@@ -553,7 +553,7 @@ def test_compare_systems_fails_when_phase_snapshot_mapping_inconsistent(tmp_path
                 "question": "Q1",
                 "category": "policy",
                 "answer": "A1",
-                "metadata": {"corpus_snapshot": "wiki-phase-1"},
+                "metadata": {"corpus_snapshot": "wiki-phase-1", "corpus_order": "001"},
             }
         )
         + "\n"
@@ -565,7 +565,7 @@ def test_compare_systems_fails_when_phase_snapshot_mapping_inconsistent(tmp_path
                 "question": "Q2",
                 "category": "policy",
                 "answer": "A2",
-                "metadata": {"corpus_snapshot": "wiki-phase-2"},
+                "metadata": {"corpus_snapshot": "wiki-phase-2", "corpus_order": "002"},
             }
         )
         + "\n",
@@ -590,6 +590,42 @@ def test_compare_systems_fails_when_phase_snapshot_mapping_inconsistent(tmp_path
         raise AssertionError("Expected compare-systems to fail on inconsistent phase-to-snapshot mapping.")
 
 
+def test_compare_systems_fails_when_phase_order_is_reversed(tmp_path):
+    rag_run_file = tmp_path / "rag.jsonl"
+    rag_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "rag", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snapshot-a", "corpus_order": "005"}})
+        + "\n"
+        + json.dumps({"query_id": "q2", "system": "rag", "phase": "phase_2", "question": "Q2", "category": "policy", "answer": "A2", "metadata": {"corpus_snapshot": "snapshot-b", "corpus_order": "004"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    wiki_run_file = tmp_path / "wiki.jsonl"
+    wiki_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snapshot-a", "corpus_order": "005"}})
+        + "\n"
+        + json.dumps({"query_id": "q2", "system": "wiki", "phase": "phase_2", "question": "Q2", "category": "policy", "answer": "A2", "metadata": {"corpus_snapshot": "snapshot-b", "corpus_order": "004"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command(
+            "compare-systems",
+            AppConfig(project_root=tmp_path),
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+        )
+    except ValueError as exc:
+        assert "phase_1 is earlier than phase_2" in str(exc)
+    else:
+        raise AssertionError("Expected compare-systems to fail when phase chronology ordering is reversed.")
+
+
 def test_compare_systems_fails_when_cross_system_phase_snapshot_identity_differs(tmp_path):
     rag_run_file = tmp_path / "rag.jsonl"
     rag_run_file.write_text(
@@ -601,7 +637,7 @@ def test_compare_systems_fails_when_cross_system_phase_snapshot_identity_differs
                 "question": "Q1",
                 "category": "policy",
                 "answer": "A1",
-                "metadata": {"corpus_snapshot": "snapshot-a"},
+                "metadata": {"corpus_snapshot": "snapshot-a", "corpus_order": "001"},
             }
         )
         + "\n"
@@ -613,7 +649,7 @@ def test_compare_systems_fails_when_cross_system_phase_snapshot_identity_differs
                 "question": "Q2",
                 "category": "policy",
                 "answer": "A2",
-                "metadata": {"corpus_snapshot": "snapshot-b"},
+                "metadata": {"corpus_snapshot": "snapshot-b", "corpus_order": "002"},
             }
         )
         + "\n",
@@ -629,7 +665,7 @@ def test_compare_systems_fails_when_cross_system_phase_snapshot_identity_differs
                 "question": "Q1",
                 "category": "policy",
                 "answer": "A1",
-                "metadata": {"corpus_snapshot": "snapshot-x"},
+                "metadata": {"corpus_snapshot": "snapshot-x", "corpus_order": "001"},
             }
         )
         + "\n"
@@ -641,7 +677,7 @@ def test_compare_systems_fails_when_cross_system_phase_snapshot_identity_differs
                 "question": "Q2",
                 "category": "policy",
                 "answer": "A2",
-                "metadata": {"corpus_snapshot": "snapshot-b"},
+                "metadata": {"corpus_snapshot": "snapshot-b", "corpus_order": "002"},
             }
         )
         + "\n",
@@ -678,7 +714,7 @@ def test_compare_systems_fails_when_query_text_or_category_mismatch_for_same_que
                 "question": "What is policy A?",
                 "category": "policy",
                 "answer": "A1",
-                "metadata": {"corpus_snapshot": "rag-phase-1"},
+                "metadata": {"corpus_snapshot": "rag-phase-1", "corpus_order": "001"},
             }
         )
         + "\n"
@@ -690,7 +726,7 @@ def test_compare_systems_fails_when_query_text_or_category_mismatch_for_same_que
                 "question": "What is policy B?",
                 "category": "policy",
                 "answer": "A2",
-                "metadata": {"corpus_snapshot": "rag-phase-2"},
+                "metadata": {"corpus_snapshot": "rag-phase-2", "corpus_order": "002"},
             }
         )
         + "\n",
@@ -706,7 +742,7 @@ def test_compare_systems_fails_when_query_text_or_category_mismatch_for_same_que
                 "question": "What changed for policy A?",
                 "category": "history",
                 "answer": "A1",
-                "metadata": {"corpus_snapshot": "wiki-phase-1"},
+                "metadata": {"corpus_snapshot": "wiki-phase-1", "corpus_order": "001"},
             }
         )
         + "\n"
@@ -718,7 +754,7 @@ def test_compare_systems_fails_when_query_text_or_category_mismatch_for_same_que
                 "question": "What is policy B?",
                 "category": "policy",
                 "answer": "A2",
-                "metadata": {"corpus_snapshot": "wiki-phase-2"},
+                "metadata": {"corpus_snapshot": "wiki-phase-2", "corpus_order": "002"},
             }
         )
         + "\n",

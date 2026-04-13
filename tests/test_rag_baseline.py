@@ -12,7 +12,7 @@ from llm_wiki_vs_rag.models import DocumentBatch, QueryCase, RetrievedChunk, Sou
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.rag.chunking import chunk_document
 from llm_wiki_vs_rag.rag.indexing import RAGIndex, _embed_text, build_in_memory_index, persist_index
-from llm_wiki_vs_rag.rag.pipeline import answer_rag_query, build_rag_index
+from llm_wiki_vs_rag.rag.pipeline import answer_rag_query, build_rag_index, run_rag_queries
 from llm_wiki_vs_rag.rag.retrieve import retrieve_top_k
 
 
@@ -143,3 +143,41 @@ def test_build_rag_index_writes_canonical_snapshot_identity(tmp_path):
 
     manifest = json.loads((paths.artifacts_dir / "rag_index" / "manifest.json").read_text(encoding="utf-8"))
     assert str(manifest["snapshot_id"]).startswith("sha256:")
+
+
+def test_run_rag_queries_reuses_loaded_index_and_llm_client(monkeypatch, tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text('{"snapshot_id":"sha256:test"}', encoding="utf-8")
+    load_calls = {"count": 0}
+    client_inits = {"count": 0}
+
+    class _FakeResponse:
+        text = "ok"
+
+        class token_usage:
+            prompt_tokens = 1
+            completion_tokens = 1
+            total_tokens = 2
+
+    class _FakeClient:
+        def __init__(self, *, config):
+            client_inits["count"] += 1
+
+        def generate_response(self, _prompt, require_token_usage=True):
+            return _FakeResponse()
+
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.pipeline.load_index", lambda _artifacts_dir: load_calls.__setitem__("count", load_calls["count"] + 1) or object())
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.pipeline.LLMClient", _FakeClient)
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.pipeline.retrieve_top_k", lambda **_kwargs: [])
+
+    results = run_rag_queries(
+        config=AppConfig(project_root=tmp_path),
+        paths=paths,
+        query_cases=[QueryCase(query_id="q1", question="Q1"), QueryCase(query_id="q2", question="Q2")],
+    )
+
+    assert len(results) == 2
+    assert load_calls["count"] == 1
+    assert client_inits["count"] == 1

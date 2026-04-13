@@ -184,3 +184,29 @@ def test_load_source_documents_fails_on_nonconforming_chronology_filenames(tmp_p
         assert "chronology requires filename stems to start with a zero-padded numeric prefix" in str(exc)
     else:
         raise AssertionError("Expected chronology validation to fail on nonconforming filenames.")
+
+
+def test_load_source_documents_retains_empty_raw_files_for_snapshot_accounting(tmp_path):
+    (tmp_path / "001_event.txt").write_text("alpha", encoding="utf-8")
+    (tmp_path / "002_event.txt").write_text("", encoding="utf-8")
+
+    batch = load_source_documents(tmp_path)
+
+    assert [doc.doc_id for doc in batch.documents] == ["001_event", "002_event"]
+    assert batch.documents[1].text == ""
+    assert [entry["filename"] for entry in batch.chronology] == ["001_event.txt", "002_event.txt"]
+
+
+def test_empty_raw_files_change_snapshot_identity(tmp_path):
+    root_a = tmp_path / "a"
+    root_b = tmp_path / "b"
+    root_a.mkdir(parents=True, exist_ok=True)
+    root_b.mkdir(parents=True, exist_ok=True)
+    (root_a / "001_event.txt").write_text("alpha", encoding="utf-8")
+    (root_b / "001_event.txt").write_text("alpha", encoding="utf-8")
+    (root_b / "002_event.txt").write_text("", encoding="utf-8")
+
+    snapshot_a = fingerprint_document_batch(load_source_documents(root_a))
+    snapshot_b = fingerprint_document_batch(load_source_documents(root_b))
+
+    assert snapshot_a != snapshot_b

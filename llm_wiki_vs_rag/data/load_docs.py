@@ -46,9 +46,7 @@ def load_source_documents(raw_dir: Path) -> DocumentBatch:
         )
 
     for file_path in candidate_paths:
-        text = file_path.read_text(encoding="utf-8").strip()
-        if not text:
-            continue
+        text = file_path.read_text(encoding="utf-8")
         documents.append(
             SourceDocument(
                 doc_id=file_path.stem,
@@ -58,7 +56,13 @@ def load_source_documents(raw_dir: Path) -> DocumentBatch:
             )
         )
 
-    return DocumentBatch(documents=documents)
+    return DocumentBatch(
+        documents=documents,
+        chronology=[
+            {"position": value, "prefix_width": width, "filename": filename}
+            for value, width, filename in chronology
+        ],
+    )
 
 
 def fingerprint_document_batch(batch: DocumentBatch) -> str:
@@ -70,3 +74,12 @@ def fingerprint_document_batch(batch: DocumentBatch) -> str:
     payload = json.dumps(canonical_documents, ensure_ascii=False, separators=(",", ":"))
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return f"sha256:{digest}"
+
+
+def corpus_order_token(batch: DocumentBatch) -> str:
+    """Return explicit corpus chronology token from validated batch chronology."""
+    if not batch.chronology:
+        raise ValueError("Cannot derive corpus chronology token from an empty raw corpus.")
+    last_position = int(batch.chronology[-1]["position"])
+    width = int(batch.chronology[-1]["prefix_width"])
+    return f"{last_position:0{width}d}"
