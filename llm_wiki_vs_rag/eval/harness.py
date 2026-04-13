@@ -1,18 +1,145 @@
 """Evaluation harness entry points."""
 
+from __future__ import annotations
+
+import csv
+import json
+from pathlib import Path
+from time import perf_counter
+
 from llm_wiki_vs_rag.config import AppConfig
-from llm_wiki_vs_rag.eval.metrics import score_exact_match
-from llm_wiki_vs_rag.eval.report import write_eval_report
-from llm_wiki_vs_rag.models import EvalRecord
+from llm_wiki_vs_rag.eval.models import EvalQueryCase, EvaluationRecord, ManualEvalLabel, RunOutputRecord
+from llm_wiki_vs_rag.models import QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
+from llm_wiki_vs_rag.rag.pipeline import run_rag_queries
+from llm_wiki_vs_rag.wiki.pipeline import run_wiki_queries
 
 
-def evaluate_queries(config: AppConfig, paths: ProjectPaths) -> list[EvalRecord]:
-    """Run a minimal evaluation pass and persist report."""
-    _ = config
-    records = [
-        EvalRecord(query_id="sample", mode="rag", score=score_exact_match("a", "a")),
-        EvalRecord(query_id="sample", mode="wiki", score=score_exact_match("a", "b")),
-    ]
-    write_eval_report(records=records, output_path=paths.artifacts_dir / config.eval.output_name)
+def load_query_cases(path: Path) -> list[EvalQueryCase]:
+    """Load evaluation query cases from JSON or JSONL."""
+    if path.suffix == ".jsonl":
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        return [EvalQueryCase.model_validate(json.loads(line)) for line in lines]
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, dict):
+        payload = payload.get("queries", [])
+    return [EvalQueryCase.model_validate(item) for item in payload]
+
+
+def _to_bool(raw: str) -> bool:
+    return raw.strip().lower() in {"1", "true", "t", "yes", "y"}
+
+
+def load_manual_labels(csv_path: Path) -> dict[str, ManualEvalLabel]:
+    """Load manual human labels from CSV keyed by query_id."""
+    labels: dict[str, ManualEvalLabel] = {}
+    with csv_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            label = ManualEvalLabel(
+                query_id=row["query_id"],
+                accuracy=row["accuracy"],
+                synthesis=row["synthesis"],
+                latest_state=row["latest_state"],
+                contradiction_detected=_to_bool(row["contradiction_detected"]),
+                contradiction_resolved=_to_bool(row["contradiction_resolved"]),
+                compression_loss=row["compression_loss"],
+                provenance_fidelity=_to_bool(row["provenance_fidelity"]),
+                evaluator_notes=row.get("evaluator_notes", ""),
+            )
+            labels[label.query_id] = label
+    return labels
+
+
+def run_queries_for_system(
+    config: AppConfig,
+    paths: ProjectPaths,
+    query_cases: list[EvalQueryCase],
+    system: str,
+) -> list[RunOutputRecord]:
+    """Run one system over a query set and normalize outputs."""
+    query_inputs = [QueryCase(query_id=case.query_id, question=case.question) for case in query_cases]
+
+    start = perf_counter()
+    if system == "rag":
+        results = run_rag_queries(config=config, paths=paths, query_cases=query_inputs)
+    elif system == "wiki":
+        results = run_wiki_queries(config=config, paths=paths, query_cases=query_inputs)
+    else:
+        raise ValueError(f"Unsupported system: {system}")
+    elapsed_ms = (perf_counter() - start) * 1000.0
+
+    by_query = {item.query_id: item for item in query_cases}
+    per_query_latency = elapsed_ms / len(results) if results else 0.0
+
+    normalized: list[RunOutputRecord] = []
+    for result in results:
+        case = by_query[result.query_id]
+        normalized.append(
+            RunOutputRecord(
+                query_id=result.query_id,
+                system=system,
+                phase=case.phase,
+                question=case.question,
+                category=case.category,
+                answer=result.answer,
+                run_id=None,
+                latency_ms=round(per_query_latency, 3),
+                metadata={"used_context_ids": result.used_context_ids},
+            )
+        )
+    return normalized
+
+
+def save_run_outputs(records: list[RunOutputRecord], output_path: Path) -> None:
+    """Save normalized run outputs as JSONL."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record.model_dump(mode="json")) + "\n")
+
+
+def load_run_outputs(path: Path) -> list[RunOutputRecord]:
+    """Load normalized run outputs from JSONL or JSON."""
+    if path.suffix == ".jsonl":
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        return [RunOutputRecord.model_validate(json.loads(line)) for line in lines]
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return [RunOutputRecord.model_validate(item) for item in payload]
+
+
+def merge_outputs_with_labels(
+    run_outputs: list[RunOutputRecord],
+    labels_by_query_id: dict[str, ManualEvalLabel],
+) -> list[EvaluationRecord]:
+    """Merge system outputs with manual labels into evaluation records."""
+    records: list[EvaluationRecord] = []
+    for output in run_outputs:
+        label = labels_by_query_id.get(output.query_id)
+        records.append(
+            EvaluationRecord(
+                query_id=output.query_id,
+                system=output.system,
+                phase=output.phase,
+                question=output.question,
+                category=output.category,
+                answer=output.answer,
+                run_id=output.run_id,
+                latency_ms=output.latency_ms,
+                prompt_tokens=output.prompt_tokens,
+                completion_tokens=output.completion_tokens,
+                total_tokens=output.total_tokens,
+                metadata=output.metadata,
+                accuracy=label.accuracy if label else None,
+                synthesis=label.synthesis if label else None,
+                latest_state=label.latest_state if label else None,
+                contradiction_detected=label.contradiction_detected if label else None,
+                contradiction_resolved=label.contradiction_resolved if label else None,
+                compression_loss=label.compression_loss if label else None,
+                provenance_fidelity=label.provenance_fidelity if label else None,
+                evaluator_notes=label.evaluator_notes if label else "",
+            )
+        )
     return records
