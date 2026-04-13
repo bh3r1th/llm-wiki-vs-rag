@@ -67,6 +67,10 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_run_parser = subparsers.add_parser("inspect-run")
     inspect_run_parser.add_argument("--run-file", type=Path, required=True)
 
+    review_pack_parser = subparsers.add_parser("make-review-pack")
+    review_pack_parser.add_argument("--run-file", type=Path, required=True)
+    review_pack_parser.add_argument("--output-dir", type=Path, required=True)
+
     return parser
 
 
