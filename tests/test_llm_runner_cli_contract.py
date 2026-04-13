@@ -1001,3 +1001,132 @@ def test_evaluate_rag_requires_phase_1_and_phase_2(tmp_path):
         assert "requires both phase_1 and phase_2" in str(exc)
     else:
         raise AssertionError("Expected evaluate-rag benchmark mode to require both phases.")
+
+
+def test_evaluate_rag_fails_when_phase_cohorts_differ(tmp_path):
+    run_file = tmp_path / "rag.jsonl"
+    run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "rag", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a", "corpus_order": "001", "execution_fingerprint": "exec-rag"}})
+        + "\n"
+        + json.dumps({"query_id": "q2", "system": "rag", "phase": "phase_2", "question": "Q2", "category": "policy", "answer": "A2", "metadata": {"corpus_snapshot": "snap-b", "corpus_order": "002", "execution_fingerprint": "exec-rag"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command("evaluate-rag", AppConfig(project_root=tmp_path), run_file=str(run_file), labels_file=str(labels_file))
+    except ValueError as exc:
+        assert "equivalent phase_1 and phase_2 query cohorts" in str(exc)
+        assert "missing_in_phase_2_sample=['q1']" in str(exc)
+        assert "extra_in_phase_2_sample=['q2']" in str(exc)
+    else:
+        raise AssertionError("Expected evaluate-rag to fail when phase cohorts differ.")
+
+
+def test_evaluate_wiki_fails_when_phase_cohorts_differ(tmp_path):
+    run_file = tmp_path / "wiki.jsonl"
+    run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a", "corpus_order": "001", "execution_fingerprint": "exec-wiki"}})
+        + "\n"
+        + json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_2", "question": "Q1 changed", "category": "history", "answer": "A2", "metadata": {"corpus_snapshot": "snap-b", "corpus_order": "002", "execution_fingerprint": "exec-wiki"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command("evaluate-wiki", AppConfig(project_root=tmp_path), run_file=str(run_file), labels_file=str(labels_file))
+    except ValueError as exc:
+        assert "equivalent phase_1 and phase_2 query cohorts" in str(exc)
+        assert "mismatched_sample" in str(exc)
+        assert "Q1 changed" in str(exc)
+    else:
+        raise AssertionError("Expected evaluate-wiki to fail when phase cohorts differ.")
+
+
+def test_compare_systems_fails_when_one_system_has_non_equivalent_phase_cohorts(tmp_path):
+    rag_run_file = tmp_path / "rag.jsonl"
+    rag_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "rag", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a", "corpus_order": "001", "execution_fingerprint": "exec-rag"}})
+        + "\n"
+        + json.dumps({"query_id": "q2", "system": "rag", "phase": "phase_2", "question": "Q2", "category": "policy", "answer": "A2", "metadata": {"corpus_snapshot": "snap-b", "corpus_order": "002", "execution_fingerprint": "exec-rag"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    wiki_run_file = tmp_path / "wiki.jsonl"
+    wiki_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a", "corpus_order": "001", "execution_fingerprint": "exec-wiki"}})
+        + "\n"
+        + json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_2", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-b", "corpus_order": "002", "execution_fingerprint": "exec-wiki"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command(
+            "compare-systems",
+            AppConfig(project_root=tmp_path),
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+        )
+    except ValueError as exc:
+        assert "equivalent phase_1 and phase_2 query cohorts" in str(exc)
+        assert "compare-systems rag" in str(exc)
+    else:
+        raise AssertionError("Expected compare-systems to fail when either system phase cohorts differ.")
+
+
+def test_compare_systems_allows_valid_same_cohort_phase_runs(tmp_path):
+    rag_run_file = tmp_path / "rag.jsonl"
+    wiki_run_file = tmp_path / "wiki.jsonl"
+    labels_file = tmp_path / "labels.csv"
+    output_dir = tmp_path / "out"
+    rag_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "rag", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a", "corpus_order": "001", "execution_fingerprint": "exec-rag"}})
+        + "\n"
+        + json.dumps({"query_id": "q1", "system": "rag", "phase": "phase_2", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-b", "corpus_order": "002", "execution_fingerprint": "exec-rag"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    wiki_run_file.write_text(
+        json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_1", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-a", "corpus_order": "001", "execution_fingerprint": "exec-wiki"}})
+        + "\n"
+        + json.dumps({"query_id": "q1", "system": "wiki", "phase": "phase_2", "question": "Q1", "category": "policy", "answer": "A1", "metadata": {"corpus_snapshot": "snap-b", "corpus_order": "002", "execution_fingerprint": "exec-wiki"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file.write_text(
+        "\n".join(
+            [
+                "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "rag,q1,phase_1,correct,full,correct,true,true,none,true,",
+                "rag,q1,phase_2,correct,full,correct,true,true,none,true,",
+                "wiki,q1,phase_1,correct,full,correct,true,true,none,true,",
+                "wiki,q1,phase_2,correct,full,correct,true,true,none,true,",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    run_command(
+        "compare-systems",
+        AppConfig(project_root=tmp_path),
+        rag_run_file=str(rag_run_file),
+        wiki_run_file=str(wiki_run_file),
+        labels_file=str(labels_file),
+        output_dir=str(output_dir),
+    )
+    assert (output_dir / "summary.json").exists()

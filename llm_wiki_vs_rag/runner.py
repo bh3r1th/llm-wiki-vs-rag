@@ -187,6 +187,36 @@ def _validate_execution_fingerprint_cohort_integrity(outputs, context: str) -> N
         )
 
 
+def _validate_intra_system_phase_cohort_equivalence(outputs, context: str) -> None:
+    phase_1_by_query = {record.query_id: record for record in outputs if record.phase == "phase_1"}
+    phase_2_by_query = {record.query_id: record for record in outputs if record.phase == "phase_2"}
+    phase_1_ids = set(phase_1_by_query)
+    phase_2_ids = set(phase_2_by_query)
+    missing_in_phase_2 = sorted(phase_1_ids - phase_2_ids)
+    extra_in_phase_2 = sorted(phase_2_ids - phase_1_ids)
+    mismatched = []
+    for query_id in sorted(phase_1_ids & phase_2_ids):
+        phase_1_record = phase_1_by_query[query_id]
+        phase_2_record = phase_2_by_query[query_id]
+        if phase_1_record.question != phase_2_record.question or phase_1_record.category != phase_2_record.category:
+            mismatched.append(
+                {
+                    "query_id": query_id,
+                    "phase_1_question": phase_1_record.question,
+                    "phase_2_question": phase_2_record.question,
+                    "phase_1_category": phase_1_record.category,
+                    "phase_2_category": phase_2_record.category,
+                }
+            )
+    if missing_in_phase_2 or extra_in_phase_2 or mismatched:
+        raise ValueError(
+            "Phase drift/evaluation requires equivalent phase_1 and phase_2 query cohorts within the same system "
+            "by query_id with stable question/category content. "
+            f"context={context}, missing_in_phase_2_sample={missing_in_phase_2[:5]}, "
+            f"extra_in_phase_2_sample={extra_in_phase_2[:5]}, mismatched_sample={mismatched[:5]}."
+        )
+
+
 def _validate_cross_system_phase_snapshot_parity(rag_outputs, wiki_outputs) -> None:
     for phase in ("phase_1", "phase_2"):
         rag_snapshots = {
@@ -254,6 +284,7 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         _validate_system_purity(outputs, expected_system=expected_system, context=f"{command}:{run_file}")
         _validate_phase_snapshot_integrity(outputs, context=f"{command}:{run_file}")
         _validate_execution_fingerprint_cohort_integrity(outputs, context=f"{command}:{run_file}")
+        _validate_intra_system_phase_cohort_equivalence(outputs, context=f"{command}:{run_file}")
         labels = load_manual_labels(labels_file)
         records = merge_outputs_with_labels(outputs, labels)
         write_reports(records=records, output_dir=output_dir)
@@ -270,6 +301,8 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         _validate_phase_snapshot_integrity(wiki_outputs, context=f"compare-systems wiki:{wiki_run_file}")
         _validate_execution_fingerprint_cohort_integrity(rag_outputs, context=f"compare-systems rag:{rag_run_file}")
         _validate_execution_fingerprint_cohort_integrity(wiki_outputs, context=f"compare-systems wiki:{wiki_run_file}")
+        _validate_intra_system_phase_cohort_equivalence(rag_outputs, context=f"compare-systems rag:{rag_run_file}")
+        _validate_intra_system_phase_cohort_equivalence(wiki_outputs, context=f"compare-systems wiki:{wiki_run_file}")
         _validate_system_uniqueness(rag_outputs, "rag")
         _validate_system_uniqueness(wiki_outputs, "wiki")
         _validate_cross_system_phase_snapshot_parity(rag_outputs, wiki_outputs)
