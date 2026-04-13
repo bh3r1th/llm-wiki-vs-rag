@@ -32,19 +32,19 @@ def build_parser() -> argparse.ArgumentParser:
     for run_command_name in ("run-rag-queries", "run-wiki-queries"):
         run_parser = subparsers.add_parser(run_command_name)
         run_parser.add_argument("--query-file", type=Path, required=True)
-        run_parser.add_argument("--output-file", type=Path, required=True)
+        run_parser.add_argument("--output-file", type=Path)
 
     for eval_command_name in ("evaluate-rag", "evaluate-wiki"):
         eval_parser = subparsers.add_parser(eval_command_name)
         eval_parser.add_argument("--run-file", type=Path, required=True)
         eval_parser.add_argument("--labels-file", type=Path, required=True)
-        eval_parser.add_argument("--output-dir", type=Path, required=True)
+        eval_parser.add_argument("--output-dir", type=Path)
 
     compare_parser = subparsers.add_parser("compare-systems")
     compare_parser.add_argument("--rag-run-file", type=Path, required=True)
     compare_parser.add_argument("--wiki-run-file", type=Path, required=True)
     compare_parser.add_argument("--labels-file", type=Path, required=True)
-    compare_parser.add_argument("--output-dir", type=Path, required=True)
+    compare_parser.add_argument("--output-dir", type=Path)
 
     return parser
 

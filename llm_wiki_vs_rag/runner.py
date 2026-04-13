@@ -19,6 +19,20 @@ from llm_wiki_vs_rag.rag.pipeline import build_rag_index
 from llm_wiki_vs_rag.wiki.pipeline import ingest_wiki
 
 
+def _validate_benchmark_llm_config(config: AppConfig) -> None:
+    provider = config.llm.provider.lower()
+    if config.llm.mock_mode or provider in {"mock", "stub"}:
+        raise ValueError("Benchmark commands cannot run with llm mock/stub mode enabled.")
+    if provider != "openai-compatible":
+        raise ValueError(f"Unsupported benchmark LLM provider: {config.llm.provider}.")
+    if not config.llm.base_url:
+        raise ValueError("Missing LLM configuration for benchmark commands: llm.base_url is required.")
+    if not config.llm.api_key:
+        raise ValueError("Missing LLM configuration for benchmark commands: llm.api_key is required.")
+    if not config.llm.model_name:
+        raise ValueError("Missing LLM configuration for benchmark commands: llm.model_name is required.")
+
+
 def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     """Dispatch supported runner commands to pipeline entry points."""
     paths = ProjectPaths(config.project_root)
@@ -27,8 +41,12 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
     if command == "build-rag-index":
         build_rag_index(config=config, paths=paths)
     elif command == "wiki-ingest":
+        if config.benchmark.locked:
+            _validate_benchmark_llm_config(config)
         ingest_wiki(config=config, paths=paths)
     elif command in {"run-rag-queries", "run-wiki-queries"}:
+        if config.benchmark.locked:
+            _validate_benchmark_llm_config(config)
         query_file = Path(str(kwargs["query_file"]))
         output_file = Path(str(kwargs.get("output_file") or paths.artifacts_dir / f"{command}.jsonl"))
         query_cases = load_query_cases(query_file)

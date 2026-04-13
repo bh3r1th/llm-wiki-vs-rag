@@ -8,10 +8,14 @@ from pydantic import BaseModel, Field
 class LLMConfig(BaseModel):
     """Configuration for the LLM client abstraction."""
 
-    provider: str = Field(default="stub", min_length=1)
+    provider: str = Field(default="openai-compatible", min_length=1)
     model_name: str = Field(default="dummy-model", min_length=1)
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     timeout_seconds: int = Field(default=30, ge=1)
+    base_url: str | None = None
+    api_key: str | None = None
+    mock_mode: bool = False
+    mock_response: str = '{"pages_to_create": [], "pages_to_update": [], "index_note": "", "log_note": ""}'
 
 
 class RAGConfig(BaseModel):
