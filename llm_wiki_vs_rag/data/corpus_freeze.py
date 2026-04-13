@@ -22,8 +22,9 @@ def _parse_order_value(file_name: str) -> tuple[int, int]:
 
 def _infer_phase(relative_path: Path) -> str:
     for part in relative_path.parts:
-        if part in {"phase_1", "phase_2"}:
-            return part
+        normalized = part.lower().replace("-", "_")
+        if normalized in {"phase_1", "phase_2"}:
+            return normalized
     raise ValueError(f"Corpus freeze could not infer phase from path: {relative_path.as_posix()}")
 
 

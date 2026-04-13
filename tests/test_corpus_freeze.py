@@ -77,6 +77,18 @@ def test_corpus_freeze_writes_manifest_outputs(tmp_path):
     assert summary["phase_2_docs"] == 50
 
 
+def test_corpus_freeze_accepts_nested_dataset_root_with_phase_dirs(tmp_path):
+    dataset_root = tmp_path / "data" / "raw"
+    _write_phase_docs(dataset_root, "phase_1", count=50)
+    _write_phase_docs(dataset_root, "phase_2", count=50, prefix_offset=50)
+
+    rows = build_corpus_manifest(dataset_root)
+
+    assert len(rows) == 100
+    assert sum(1 for row in rows if row["phase"] == "phase_1") == 50
+    assert sum(1 for row in rows if row["phase"] == "phase_2") == 50
+
+
 def test_cli_and_runner_support_freeze_corpus_command(tmp_path):
     _write_phase_docs(tmp_path / "dataset", "phase_1", count=50)
     _write_phase_docs(tmp_path / "dataset", "phase_2", count=50, prefix_offset=50)
