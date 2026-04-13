@@ -59,6 +59,9 @@ def build_parser() -> argparse.ArgumentParser:
     label_template_parser.add_argument("--run-file", type=Path, required=True)
     label_template_parser.add_argument("--output-file", type=Path, required=True)
 
+    inspect_run_parser = subparsers.add_parser("inspect-run")
+    inspect_run_parser.add_argument("--run-file", type=Path, required=True)
+
     return parser
 
 

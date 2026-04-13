@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections import Counter
 from pathlib import Path
 
 from llm_wiki_vs_rag.config import AppConfig
@@ -258,6 +259,100 @@ def _validate_system_purity(outputs, expected_system: str, context: str) -> None
         )
 
 
+def _inspect_run_outputs(run_file: Path) -> None:
+    outputs = load_run_outputs(run_file)
+    duplicates = Counter((record.system, record.query_id, record.phase) for record in outputs)
+    duplicate_rows = [
+        {"system": system, "query_id": query_id, "phase": phase, "count": count}
+        for (system, query_id, phase), count in sorted(duplicates.items())
+        if count > 1
+    ]
+    if duplicate_rows:
+        raise ValueError(
+            "Run outputs must be unique per (system, query_id, phase). "
+            f"duplicate_sample={duplicate_rows[:5]}."
+        )
+
+    missing_snapshot_rows = []
+    missing_execution_fingerprint_rows = []
+    metadata_missing_count = 0
+    snapshots_by_cohort: dict[tuple[str, str], set[str]] = {}
+    fingerprints_by_cohort: dict[tuple[str, str], set[str]] = {}
+    artifact_paths: list[str] = []
+    for row_index, record in enumerate(outputs):
+        snapshot = str(record.metadata.get("corpus_snapshot", "")).strip()
+        fingerprint = str(record.metadata.get("execution_fingerprint", "")).strip()
+        artifact_dir = str(record.metadata.get("artifact_dir", "")).strip()
+        if not snapshot:
+            metadata_missing_count += 1
+            missing_snapshot_rows.append((row_index, record.system, record.query_id, record.phase))
+        else:
+            snapshots_by_cohort.setdefault((record.system, record.phase), set()).add(snapshot)
+        if not fingerprint:
+            metadata_missing_count += 1
+            missing_execution_fingerprint_rows.append((row_index, record.system, record.query_id, record.phase))
+        else:
+            fingerprints_by_cohort.setdefault((record.system, record.phase), set()).add(fingerprint)
+        if artifact_dir:
+            artifact_paths.append(artifact_dir)
+
+    if missing_snapshot_rows:
+        raise ValueError(
+            "Run outputs must include metadata.corpus_snapshot for every row. "
+            f"missing_sample={missing_snapshot_rows[:5]}."
+        )
+    if missing_execution_fingerprint_rows:
+        raise ValueError(
+            "Run outputs must include metadata.execution_fingerprint for every row. "
+            f"missing_sample={missing_execution_fingerprint_rows[:5]}."
+        )
+    mixed_snapshots = [
+        {"system": system, "phase": phase, "snapshots": sorted(values)}
+        for (system, phase), values in sorted(snapshots_by_cohort.items())
+        if len(values) > 1
+    ]
+    if mixed_snapshots:
+        raise ValueError(
+            "Inconsistent corpus_snapshot within system/phase cohort. "
+            f"cohort_sample={mixed_snapshots[:5]}."
+        )
+    mixed_fingerprints = [
+        {"system": system, "phase": phase, "execution_fingerprints": sorted(values)}
+        for (system, phase), values in sorted(fingerprints_by_cohort.items())
+        if len(values) > 1
+    ]
+    if mixed_fingerprints:
+        raise ValueError(
+            "Inconsistent execution_fingerprint within system/phase cohort. "
+            f"cohort_sample={mixed_fingerprints[:5]}."
+        )
+
+    systems = sorted({record.system for record in outputs})
+    phases = sorted({record.phase for record in outputs})
+    categories = sorted({record.category for record in outputs})
+    unique_query_ids = len({record.query_id for record in outputs})
+    snapshot_summary = {
+        f"{system}/{phase}": next(iter(values))
+        for (system, phase), values in sorted(snapshots_by_cohort.items())
+    }
+    execution_summary = {
+        f"{system}/{phase}": next(iter(values))
+        for (system, phase), values in sorted(fingerprints_by_cohort.items())
+    }
+    artifact_sample = sorted(set(artifact_paths))[:5]
+    print(f"run_file={run_file}")
+    print(f"total_rows={len(outputs)}")
+    print(f"systems={systems}")
+    print(f"phases={phases}")
+    print(f"categories={categories}")
+    print(f"unique_query_ids={unique_query_ids}")
+    print("duplicate_identity_count=0")
+    print(f"snapshot_by_system_phase={snapshot_summary}")
+    print(f"execution_fingerprint_by_system_phase={execution_summary}")
+    print(f"missing_metadata_fields_count={metadata_missing_count}")
+    print(f"artifact_path_sample={artifact_sample}")
+
+
 def _run_phase_specific_benchmark(
     *,
     config: AppConfig,
@@ -383,5 +478,8 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
             raise ValueError(f"Manual label template input must be JSONL (.jsonl). got={run_file.name}")
         run_outputs = load_run_outputs(run_file)
         write_manual_label_template_from_run_outputs(run_outputs=run_outputs, output_path=output_file)
+    elif command == "inspect-run":
+        run_file = Path(str(kwargs["run_file"]))
+        _inspect_run_outputs(run_file)
     else:
         raise ValueError(f"Unsupported command: {command}")
