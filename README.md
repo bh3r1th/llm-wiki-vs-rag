@@ -73,8 +73,8 @@ python -m llm_wiki_vs_rag.cli.main build-rag-index
 python -m llm_wiki_vs_rag.cli.main wiki-ingest
 
 # run queries
-python -m llm_wiki_vs_rag.cli.main run-rag-queries --query-file path/to/queries.jsonl --output-file artifacts/run-rag-queries.jsonl
-python -m llm_wiki_vs_rag.cli.main run-wiki-queries --query-file path/to/queries.jsonl --output-file artifacts/run-wiki-queries.jsonl
+python -m llm_wiki_vs_rag.cli.main run-rag-queries --query-file path/to/queries.jsonl --phase phase_1 --output-file artifacts/run-rag-queries.jsonl
+python -m llm_wiki_vs_rag.cli.main run-wiki-queries --query-file path/to/queries.jsonl --phase phase_1 --output-file artifacts/run-wiki-queries.jsonl
 
 # compare systems
 python -m llm_wiki_vs_rag.cli.main compare-systems \
