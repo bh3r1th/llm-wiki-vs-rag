@@ -17,6 +17,8 @@ from llm_wiki_vs_rag.models import GenerationResult
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.eval.report import write_reports
 from llm_wiki_vs_rag.config import AppConfig
+from llm_wiki_vs_rag.rag.pipeline import _new_run_id as rag_run_id
+from llm_wiki_vs_rag.wiki.pipeline import _new_run_id as wiki_run_id
 
 
 def _sample_outputs() -> list[RunOutputRecord]:
@@ -206,3 +208,32 @@ def test_report_generation_contains_run_traceability_fields(tmp_path):
     assert "run_id" in per_query
     assert "artifact_dir" in per_query
     assert "rag-1" in per_query
+
+
+def test_wildcard_labels_are_rejected(tmp_path):
+    labels_path = tmp_path / "labels.csv"
+    labels_path.write_text(
+        "\n".join(
+            [
+                "system,query_id,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes",
+                "*,q1,correct,full,correct,true,true,none,true,",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    try:
+        load_manual_labels(labels_path)
+    except ValueError as exc:
+        assert "wildcard labels are not supported" in str(exc)
+    else:
+        raise AssertionError("Expected wildcard label rows to be rejected.")
+
+
+def test_repeated_runs_within_same_second_have_distinct_run_ids():
+    rag_first = rag_run_id("q1")
+    rag_second = rag_run_id("q1")
+    wiki_first = wiki_run_id("q1")
+    wiki_second = wiki_run_id("q1")
+
+    assert rag_first != rag_second
+    assert wiki_first != wiki_second

@@ -37,6 +37,10 @@ def load_manual_labels(csv_path: Path) -> dict[tuple[str, str], ManualEvalLabel]
         reader = csv.DictReader(handle)
         for row in reader:
             system = (row.get("system") or "").strip()
+            if not system or system == "*":
+                raise ValueError(
+                    "Manual labels must specify an explicit system per row; wildcard labels are not supported."
+                )
             label = ManualEvalLabel(
                 query_id=row["query_id"],
                 system=(system or None),
@@ -49,8 +53,7 @@ def load_manual_labels(csv_path: Path) -> dict[tuple[str, str], ManualEvalLabel]
                 provenance_fidelity=_to_bool(row["provenance_fidelity"]),
                 evaluator_notes=row.get("evaluator_notes", ""),
             )
-            label_system = label.system or "*"
-            labels[(label_system, label.query_id)] = label
+            labels[(label.system, label.query_id)] = label
     return labels
 
 
@@ -120,8 +123,6 @@ def merge_outputs_with_labels(
     records: list[EvaluationRecord] = []
     for output in run_outputs:
         label = labels_by_system_query.get((output.system, output.query_id))
-        if label is None:
-            label = labels_by_system_query.get(("*", output.query_id))
         records.append(
             EvaluationRecord(
                 query_id=output.query_id,
