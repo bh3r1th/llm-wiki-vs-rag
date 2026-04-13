@@ -8,11 +8,12 @@ from pathlib import Path
 
 from llm_wiki_vs_rag.config import AppConfig, BenchmarkConfig, LLMConfig, RAGConfig, WikiConfig
 from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
-from llm_wiki_vs_rag.models import QueryCase
+from llm_wiki_vs_rag.models import QueryCase, SourceDocument
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.rag.pipeline import answer_rag_query
 from llm_wiki_vs_rag.wiki.pipeline import ingest_wiki, run_wiki_queries
 from llm_wiki_vs_rag.wiki.prompting import build_wiki_query_prompt
+from llm_wiki_vs_rag.wiki.ingest import ingest_one_document
 
 
 def test_locked_benchmark_uses_same_top_k_for_rag_and_wiki(monkeypatch, tmp_path):
@@ -146,3 +147,40 @@ def test_wiki_ingest_artifacts_preserve_rerun_history_for_same_doc_id(monkeypatc
         for artifact in doc_artifacts
     }
     assert len(run_ids) == 2
+
+
+def test_wiki_ingest_fails_on_empty_model_output_without_raw_copy_fallback(tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+
+    class _FakeLLM:
+        def generate_json(self, _prompt):
+            return {"pages_to_create": [], "pages_to_update": []}
+
+    try:
+        ingest_one_document(
+            paths=paths,
+            llm_client=_FakeLLM(),
+            document=SourceDocument(doc_id="001", source_path=tmp_path / "001.txt", text="raw facts"),
+            ingest_run_id="run-1",
+            corpus_snapshot="sha256:snapshot",
+        )
+    except ValueError as exc:
+        assert "Ingest model output is empty" in str(exc)
+    else:
+        raise AssertionError("Expected empty ingest output to fail.")
+
+    failure_path = paths.artifacts_dir / "wiki_ingest" / "run-1" / "001" / "ingest_failure.json"
+    assert failure_path.exists()
+    assert not list(paths.wiki_dir.glob("*.md"))
+
+
+def test_load_source_documents_fails_on_nonconforming_chronology_filenames(tmp_path):
+    (tmp_path / "doc-alpha.txt").write_text("alpha", encoding="utf-8")
+    (tmp_path / "002-event.txt").write_text("beta", encoding="utf-8")
+    try:
+        load_source_documents(tmp_path)
+    except ValueError as exc:
+        assert "chronology requires filename stems to start with a zero-padded numeric prefix" in str(exc)
+    else:
+        raise AssertionError("Expected chronology validation to fail on nonconforming filenames.")

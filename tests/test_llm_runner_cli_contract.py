@@ -88,7 +88,7 @@ def test_benchmark_commands_reject_mock_mode(tmp_path):
     )
 
     try:
-        run_command("run-rag-queries", config, query_file=str(query_file))
+        run_command("run-rag-queries", config, query_file=str(query_file), phase="phase_1")
     except ValueError as exc:
         assert "cannot run with llm mock_mode enabled" in str(exc)
     else:
@@ -107,7 +107,7 @@ def test_benchmark_commands_validate_single_mock_control_mechanism(tmp_path):
     )
 
     try:
-        run_command("run-rag-queries", config, query_file=str(query_file))
+        run_command("run-rag-queries", config, query_file=str(query_file), phase="phase_1")
     except ValueError as exc:
         assert "Unsupported benchmark LLM provider: mock" in str(exc)
     else:
@@ -126,7 +126,7 @@ def test_benchmark_commands_require_provider_config(tmp_path):
     )
 
     try:
-        run_command("run-wiki-queries", config, query_file=str(query_file))
+        run_command("run-wiki-queries", config, query_file=str(query_file), phase="phase_1")
     except ValueError as exc:
         assert "set llm.base_url or LLM_BASE_URL" in str(exc)
     else:
@@ -149,7 +149,7 @@ def test_benchmark_validation_accepts_env_only_provider_config(monkeypatch, tmp_
     captured: dict[str, object] = {}
     monkeypatch.setattr("llm_wiki_vs_rag.runner.save_run_outputs", lambda records, output_path: captured.update({"ok": True}))
 
-    run_command("run-rag-queries", config, query_file=str(query_file))
+    run_command("run-rag-queries", config, query_file=str(query_file), phase="phase_1", snapshot_id="sha256:override")
 
     assert captured["ok"] is True
 
@@ -186,8 +186,11 @@ def test_wiki_ingest_rejects_invalid_provider_even_when_unlocked(tmp_path):
 
 def test_cli_output_args_are_optional_and_runner_defaults_are_used(monkeypatch, tmp_path):
     parser = build_parser()
-    args = parser.parse_args(["run-rag-queries", "--query-file", str(tmp_path / "queries.jsonl")])
+    args = parser.parse_args(
+        ["run-rag-queries", "--query-file", str(tmp_path / "queries.jsonl"), "--phase", "phase_1"]
+    )
     assert args.output_file is None
+    assert args.phase == "phase_1"
 
     query_file = tmp_path / "queries.jsonl"
     query_file.write_text(
@@ -208,9 +211,19 @@ def test_cli_output_args_are_optional_and_runner_defaults_are_used(monkeypatch, 
         project_root=tmp_path,
         llm=LLMConfig(provider="openai-compatible", base_url="http://example", api_key="key"),
     )
-    run_command("run-rag-queries", config, query_file=str(query_file))
+    run_command("run-rag-queries", config, query_file=str(query_file), phase="phase_1")
 
     assert captured["output_path"] == tmp_path / "artifacts" / "run-rag-queries.jsonl"
+
+
+def test_cli_run_queries_requires_explicit_phase_argument(tmp_path):
+    parser = build_parser()
+    try:
+        parser.parse_args(["run-rag-queries", "--query-file", str(tmp_path / "queries.jsonl")])
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("Expected run-rag-queries CLI parser to require --phase.")
 
 
 def test_compare_systems_fails_on_mismatched_query_cohorts(tmp_path):

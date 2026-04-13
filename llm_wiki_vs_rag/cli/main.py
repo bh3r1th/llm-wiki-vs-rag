@@ -20,6 +20,8 @@ def build_parser() -> argparse.ArgumentParser:
     for run_command_name in ("run-rag-queries", "run-wiki-queries"):
         run_parser = subparsers.add_parser(run_command_name)
         run_parser.add_argument("--query-file", type=Path, required=True)
+        run_parser.add_argument("--phase", choices=("phase_1", "phase_2"), required=True)
+        run_parser.add_argument("--snapshot-id", type=str)
         run_parser.add_argument("--output-file", type=Path)
 
     for eval_command_name in ("evaluate-rag", "evaluate-wiki"):
