@@ -162,8 +162,8 @@ def load_manual_labels_from_text(csv_payload: str):
 def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypatch, tmp_path):
     def _fake_rag(**_kwargs):
         return [
-            GenerationResult(query_id="q1", answer="a1", mode="rag", run_id="r1", latency_ms=11.1, artifact_dir="art/1"),
-            GenerationResult(query_id="q2", answer="a2", mode="rag", run_id="r2", latency_ms=22.2, artifact_dir="art/2"),
+            GenerationResult(query_id="q1", answer="a1", mode="rag", run_id="r1", latency_ms=11.1, artifact_dir="art/1", prompt_tokens=3, completion_tokens=4, total_tokens=7),
+            GenerationResult(query_id="q2", answer="a2", mode="rag", run_id="r2", latency_ms=22.2, artifact_dir="art/2", prompt_tokens=5, completion_tokens=6, total_tokens=11),
         ]
 
     monkeypatch.setattr("llm_wiki_vs_rag.eval.harness.run_rag_queries", _fake_rag)
@@ -179,6 +179,9 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
 
     assert [record.latency_ms for record in records] == [11.1, 22.2]
     assert [record.run_id for record in records] == ["r1", "r2"]
+    assert [record.prompt_tokens for record in records] == [3, 5]
+    assert [record.completion_tokens for record in records] == [4, 6]
+    assert [record.total_tokens for record in records] == [7, 11]
 
 
 def load_query_case(query_id: str, question: str):
@@ -198,6 +201,9 @@ def test_report_generation_contains_run_traceability_fields(tmp_path):
             answer="A1",
             run_id="rag-1",
             latency_ms=10.0,
+            prompt_tokens=12,
+            completion_tokens=8,
+            total_tokens=20,
             metadata={"artifact_dir": "artifacts/rag_runs/rag-1"},
         )
     ]
@@ -209,6 +215,9 @@ def test_report_generation_contains_run_traceability_fields(tmp_path):
     assert "run_id" in per_query
     assert "artifact_dir" in per_query
     assert "rag-1" in per_query
+    assert "prompt_tokens" in per_query
+    assert "completion_tokens" in per_query
+    assert ",20," in per_query
 
 
 def test_wildcard_labels_are_rejected(tmp_path):

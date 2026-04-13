@@ -5,7 +5,24 @@ import os
 from typing import Any
 from urllib import error, request
 
+from pydantic import BaseModel, Field
+
 from llm_wiki_vs_rag.config import LLMConfig
+
+
+class TokenUsage(BaseModel):
+    """Token usage for one model generation."""
+
+    prompt_tokens: int = Field(ge=0)
+    completion_tokens: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
+
+
+class LLMResponse(BaseModel):
+    """Normalized text response with provider metadata."""
+
+    text: str
+    token_usage: TokenUsage | None = None
 
 
 class _OpenAICompatibleAdapter:
@@ -18,7 +35,7 @@ class _OpenAICompatibleAdapter:
         self.temperature = temperature
         self.timeout_seconds = timeout_seconds
 
-    def generate(self, prompt: str) -> str:
+    def generate(self, prompt: str) -> LLMResponse:
         payload = {
             "model": self.model_name,
             "messages": [{"role": "user", "content": prompt}],
@@ -44,9 +61,25 @@ class _OpenAICompatibleAdapter:
 
         try:
             parsed = json.loads(raw)
-            return str(parsed["choices"][0]["message"]["content"])
+            content = str(parsed["choices"][0]["message"]["content"])
         except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
             raise ValueError("OpenAI-compatible response missing choices[0].message.content") from exc
+
+        usage_payload = parsed.get("usage")
+        token_usage = None
+        if isinstance(usage_payload, dict):
+            try:
+                token_usage = TokenUsage.model_validate(
+                    {
+                        "prompt_tokens": usage_payload["prompt_tokens"],
+                        "completion_tokens": usage_payload["completion_tokens"],
+                        "total_tokens": usage_payload["total_tokens"],
+                    }
+                )
+            except (KeyError, TypeError, ValueError):
+                token_usage = None
+
+        return LLMResponse(text=content, token_usage=token_usage)
 
 
 class LLMClient:
@@ -84,13 +117,25 @@ class LLMClient:
             timeout_seconds=config.timeout_seconds,
         )
 
+    def generate_response(self, prompt: str, *, require_token_usage: bool = False) -> LLMResponse:
+        """Generate model output plus provider metadata."""
+        if self._mock_mode:
+            response = LLMResponse(text=self.config.mock_response)
+        else:
+            if self._adapter is None:
+                raise ValueError("LLM adapter is not initialized.")
+            response = self._adapter.generate(prompt)
+
+        if require_token_usage and response.token_usage is None:
+            raise ValueError(
+                "Provider did not return token usage fields (prompt_tokens/completion_tokens/total_tokens). "
+                "Token-based cost metrics are unsupported for this run."
+            )
+        return response
+
     def generate(self, prompt: str) -> str:
         """Generate text output for a prompt."""
-        if self._mock_mode:
-            return self.config.mock_response
-        if self._adapter is None:
-            raise ValueError("LLM adapter is not initialized.")
-        return self._adapter.generate(prompt)
+        return self.generate_response(prompt).text
 
     def generate_json(self, prompt: str) -> dict[str, Any]:
         """Generate JSON output for a prompt."""

@@ -26,6 +26,59 @@ def test_generate_json_fails_on_non_json_mock_response():
         raise AssertionError("Expected strict JSON parse failure.")
 
 
+def test_provider_response_token_usage_is_captured(monkeypatch):
+    class _FakeHTTPResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "choices": [{"message": {"content": "hello"}}],
+                    "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18},
+                }
+            ).encode("utf-8")
+
+    monkeypatch.setattr("llm_wiki_vs_rag.llm.client.request.urlopen", lambda *_args, **_kwargs: _FakeHTTPResponse())
+
+    client = LLMClient(
+        LLMConfig(provider="openai-compatible", base_url="https://example", api_key="k", model_name="m")
+    )
+    response = client.generate_response("prompt", require_token_usage=True)
+
+    assert response.text == "hello"
+    assert response.token_usage is not None
+    assert response.token_usage.total_tokens == 18
+
+
+def test_benchmark_generate_fails_when_provider_usage_is_missing(monkeypatch):
+    class _FakeHTTPResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"choices": [{"message": {"content": "hello"}}]}).encode("utf-8")
+
+    monkeypatch.setattr("llm_wiki_vs_rag.llm.client.request.urlopen", lambda *_args, **_kwargs: _FakeHTTPResponse())
+
+    client = LLMClient(
+        LLMConfig(provider="openai-compatible", base_url="https://example", api_key="k", model_name="m")
+    )
+
+    try:
+        client.generate_response("prompt", require_token_usage=True)
+    except ValueError as exc:
+        assert "did not return token usage" in str(exc)
+    else:
+        raise AssertionError("Expected benchmark generation to fail when usage metadata is absent.")
+
+
 def test_benchmark_commands_reject_mock_mode(tmp_path):
     config = AppConfig(project_root=tmp_path, llm=LLMConfig(provider="openai-compatible", mock_mode=True))
     query_file = tmp_path / "queries.jsonl"

@@ -57,7 +57,8 @@ def run_wiki_queries(
             continue
 
         prompt = build_wiki_query_prompt(question=query.question, pages=selected_pages)
-        answer = llm_client.generate(prompt)
+        llm_response = llm_client.generate_response(prompt, require_token_usage=True)
+        answer = llm_response.text
         run_id = _new_run_id(query.query_id)
 
         run_dir = paths.artifacts_dir / "wiki_runs" / run_id
@@ -76,6 +77,11 @@ def run_wiki_queries(
                     "mode": "wiki",
                     "used_context_ids": [page.slug for page in selected_pages],
                     "fallback_to_rag": fallback_enabled,
+                    "token_usage": {
+                        "prompt_tokens": llm_response.token_usage.prompt_tokens,
+                        "completion_tokens": llm_response.token_usage.completion_tokens,
+                        "total_tokens": llm_response.token_usage.total_tokens,
+                    },
                 },
                 indent=2,
             ),
@@ -91,6 +97,9 @@ def run_wiki_queries(
                 run_id=run_id,
                 latency_ms=round((perf_counter() - start) * 1000.0, 3),
                 artifact_dir=str(run_dir),
+                prompt_tokens=llm_response.token_usage.prompt_tokens,
+                completion_tokens=llm_response.token_usage.completion_tokens,
+                total_tokens=llm_response.token_usage.total_tokens,
             )
         )
     return results

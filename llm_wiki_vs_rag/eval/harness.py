@@ -92,6 +92,9 @@ def run_queries_for_system(
                 answer=result.answer,
                 run_id=result.run_id,
                 latency_ms=result.latency_ms,
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+                total_tokens=result.total_tokens,
                 metadata={
                     "used_context_ids": result.used_context_ids,
                     "artifact_dir": result.artifact_dir,
