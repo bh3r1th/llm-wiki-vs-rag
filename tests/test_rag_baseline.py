@@ -1,6 +1,9 @@
 """Focused tests for RAG baseline behavior."""
 
 import json
+import os
+import subprocess
+import sys
 
 import numpy as np
 
@@ -8,7 +11,7 @@ from llm_wiki_vs_rag.config import AppConfig
 from llm_wiki_vs_rag.models import DocumentBatch, QueryCase, RetrievedChunk, SourceDocument
 from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.rag.chunking import chunk_document
-from llm_wiki_vs_rag.rag.indexing import RAGIndex, build_in_memory_index, persist_index
+from llm_wiki_vs_rag.rag.indexing import RAGIndex, _embed_text, build_in_memory_index, persist_index
 from llm_wiki_vs_rag.rag.pipeline import answer_rag_query
 from llm_wiki_vs_rag.rag.retrieve import retrieve_top_k
 
@@ -49,6 +52,54 @@ def test_retrieve_top_k_returns_best_matches(monkeypatch):
 
     assert [chunk.chunk_id for chunk in top] == ["d:1", "d:0"]
     assert len(top) == 2
+
+
+def test_embeddings_are_deterministic_across_python_hash_seeds():
+    vector = _embed_text("Deterministic Token Test").tolist()
+    script = (
+        "import json;"
+        "from llm_wiki_vs_rag.rag.indexing import _embed_text;"
+        "print(json.dumps(_embed_text('Deterministic Token Test').tolist()))"
+    )
+    env_one = os.environ.copy()
+    env_one["PYTHONHASHSEED"] = "1"
+    env_two = os.environ.copy()
+    env_two["PYTHONHASHSEED"] = "999"
+    first = subprocess.check_output([sys.executable, "-c", script], text=True, env=env_one)
+    second = subprocess.check_output([sys.executable, "-c", script], text=True, env=env_two)
+
+    assert np.allclose(np.array(vector, dtype=np.float32), np.array(json.loads(first), dtype=np.float32))
+    assert np.allclose(np.array(vector, dtype=np.float32), np.array(json.loads(second), dtype=np.float32))
+
+
+def test_retrieve_top_k_enforces_explicit_cosine_similarity(monkeypatch):
+    chunks = [
+        RetrievedChunk(doc_id="d", chunk_id="d:0", text="c0"),
+        RetrievedChunk(doc_id="d", chunk_id="d:1", text="c1"),
+    ]
+    index = RAGIndex(
+        chunks=chunks,
+        embeddings=np.array(
+            [
+                [5.0, 0.0],
+                [4.0, 4.0],
+            ],
+            dtype=np.float32,
+        ),
+        backend="numpy",
+    )
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.retrieve.embed_query", lambda _query: np.array([1.0, 0.0], dtype=np.float32))
+
+    top = retrieve_top_k(index=index, query="q", top_k=2)
+    assert [chunk.chunk_id for chunk in top] == ["d:0", "d:1"]
+    assert top[0].score == 1.0
+    assert top[1].score < 1.0
+
+
+def test_build_in_memory_index_uses_numpy_backend_only(tmp_path):
+    document = SourceDocument(doc_id="doc1", source_path=tmp_path / "doc1.txt", text="alpha beta gamma")
+    index = build_in_memory_index(batch=DocumentBatch(documents=[document]), chunk_size_chars=100, chunk_overlap_chars=0)
+    assert index.backend == "numpy"
 
 
 def test_pipeline_saves_query_artifacts(tmp_path):

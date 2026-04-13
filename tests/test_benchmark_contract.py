@@ -15,7 +15,6 @@ from llm_wiki_vs_rag.wiki.prompting import build_wiki_query_prompt
 def test_locked_benchmark_uses_same_top_k_for_rag_and_wiki(monkeypatch, tmp_path):
     paths = ProjectPaths(project_root=tmp_path)
     paths.ensure()
-    (paths.artifacts_dir / "rag_index.json").write_text('{"chunks": [], "backend": "numpy"}', encoding="utf-8")
 
     config = AppConfig(
         project_root=tmp_path,

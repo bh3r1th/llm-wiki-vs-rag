@@ -17,12 +17,15 @@ from llm_wiki_vs_rag.wiki.pipeline import run_wiki_queries
 def resolve_corpus_snapshot_identity(paths: ProjectPaths, system: str) -> str:
     """Resolve a concrete corpus snapshot identifier for benchmark run outputs."""
     if system == "rag":
-        base_path = paths.artifacts_dir / "rag_index.json"
-        manifest_candidates = [
-            paths.artifacts_dir / "rag_index.snapshot.json",
-            paths.artifacts_dir / "rag_index.manifest.json",
-            paths.artifacts_dir / "manifest.json",
-        ]
+        manifest_path = paths.artifacts_dir / "rag_index" / "manifest.json"
+        if not manifest_path.exists():
+            return str(manifest_path.resolve())
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            snapshot_id = payload.get("snapshot_id") or payload.get("id") or payload.get("snapshot")
+            if snapshot_id:
+                return str(snapshot_id)
+        return str(manifest_path.resolve())
     elif system == "wiki":
         base_path = paths.wiki_dir
         manifest_candidates = [
@@ -33,13 +36,12 @@ def resolve_corpus_snapshot_identity(paths: ProjectPaths, system: str) -> str:
         raise ValueError(f"Unsupported system for snapshot resolution: {system}")
 
     for manifest_path in manifest_candidates:
-        if not manifest_path.exists():
-            continue
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if isinstance(payload, dict):
-            snapshot_id = payload.get("snapshot_id") or payload.get("id") or payload.get("snapshot")
-            if snapshot_id:
-                return str(snapshot_id)
+        if manifest_path.exists():
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                snapshot_id = payload.get("snapshot_id") or payload.get("id") or payload.get("snapshot")
+                if snapshot_id:
+                    return str(snapshot_id)
     return str(base_path.resolve())
 
 

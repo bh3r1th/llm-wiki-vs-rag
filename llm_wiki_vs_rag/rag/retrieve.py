@@ -12,7 +12,16 @@ def retrieve_top_k(index: RAGIndex, query: str, top_k: int) -> list[RetrievedChu
         return []
 
     query_vector = embed_query(query)
-    scores = np.dot(index.embeddings, query_vector)
+    query_norm = float(np.linalg.norm(query_vector))
+    if query_norm > 0:
+        query_vector = query_vector / query_norm
+
+    chunk_vectors = index.embeddings
+    row_norms = np.linalg.norm(chunk_vectors, axis=1, keepdims=True)
+    row_norms[row_norms == 0.0] = 1.0
+    chunk_vectors = chunk_vectors / row_norms
+
+    scores = np.dot(chunk_vectors, query_vector)
     ordered = np.argsort(-scores)
 
     results: list[RetrievedChunk] = []
