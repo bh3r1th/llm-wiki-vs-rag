@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
 
 from llm_wiki_vs_rag.config import AppConfig
-from llm_wiki_vs_rag.data.load_docs import load_source_documents
+from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
 from llm_wiki_vs_rag.llm.client import LLMClient
 from llm_wiki_vs_rag.models import GenerationResult, QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
@@ -23,13 +24,20 @@ def _new_run_id(query_id: str) -> str:
     return f"{query_id}-{timestamp}-{uuid4().hex[:8]}"
 
 
+def _write_wiki_snapshot_manifest(wiki_dir: Path, snapshot_id: str) -> None:
+    manifest_path = wiki_dir / "snapshot.json"
+    manifest_path.write_text(json.dumps({"snapshot_id": snapshot_id}, indent=2), encoding="utf-8")
+
+
 def ingest_wiki(config: AppConfig, paths: ProjectPaths):
     """Process raw docs sequentially and update markdown wiki incrementally."""
     batch = load_source_documents(paths.raw_dir)
+    snapshot_id = fingerprint_document_batch(batch)
     llm_client = LLMClient(config=config.llm)
     summaries = []
     for document in batch.documents:
         summaries.append(ingest_one_document(paths=paths, llm_client=llm_client, document=document))
+    _write_wiki_snapshot_manifest(paths.wiki_dir, snapshot_id)
     return summaries
 
 

@@ -1,5 +1,7 @@
 """Document loading from filesystem."""
 
+import hashlib
+import json
 from pathlib import Path
 
 from llm_wiki_vs_rag.models import DocumentBatch, SourceDocument
@@ -27,3 +29,18 @@ def load_source_documents(raw_dir: Path) -> DocumentBatch:
         )
 
     return DocumentBatch(documents=documents)
+
+
+def fingerprint_document_batch(batch: DocumentBatch) -> str:
+    """Compute deterministic corpus snapshot identity from loaded document contents."""
+    canonical_documents = [
+        {
+            "doc_id": document.doc_id,
+            "source_path": str(document.source_path),
+            "text": document.text,
+        }
+        for document in batch.documents
+    ]
+    payload = json.dumps(canonical_documents, ensure_ascii=False, separators=(",", ":"))
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"

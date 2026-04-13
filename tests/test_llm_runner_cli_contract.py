@@ -504,3 +504,80 @@ def test_compare_systems_fails_when_phase_snapshot_mapping_inconsistent(tmp_path
         assert "distinct corpus snapshots for phase_1 and phase_2" in str(exc)
     else:
         raise AssertionError("Expected compare-systems to fail on inconsistent phase-to-snapshot mapping.")
+
+
+def test_compare_systems_fails_when_query_text_or_category_mismatch_for_same_query_id_phase(tmp_path):
+    rag_run_file = tmp_path / "rag.jsonl"
+    rag_run_file.write_text(
+        json.dumps(
+            {
+                "query_id": "q1",
+                "system": "rag",
+                "phase": "phase_1",
+                "question": "What is policy A?",
+                "category": "policy",
+                "answer": "A1",
+                "metadata": {"corpus_snapshot": "rag-phase-1"},
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "query_id": "q2",
+                "system": "rag",
+                "phase": "phase_2",
+                "question": "What is policy B?",
+                "category": "policy",
+                "answer": "A2",
+                "metadata": {"corpus_snapshot": "rag-phase-2"},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    wiki_run_file = tmp_path / "wiki.jsonl"
+    wiki_run_file.write_text(
+        json.dumps(
+            {
+                "query_id": "q1",
+                "system": "wiki",
+                "phase": "phase_1",
+                "question": "What changed for policy A?",
+                "category": "history",
+                "answer": "A1",
+                "metadata": {"corpus_snapshot": "wiki-phase-1"},
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "query_id": "q2",
+                "system": "wiki",
+                "phase": "phase_2",
+                "question": "What is policy B?",
+                "category": "policy",
+                "answer": "A2",
+                "metadata": {"corpus_snapshot": "wiki-phase-2"},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    labels_file = tmp_path / "labels.csv"
+    labels_file.write_text(
+        "system,query_id,phase,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes\n",
+        encoding="utf-8",
+    )
+    try:
+        run_command(
+            "compare-systems",
+            AppConfig(project_root=tmp_path),
+            rag_run_file=str(rag_run_file),
+            wiki_run_file=str(wiki_run_file),
+            labels_file=str(labels_file),
+        )
+    except ValueError as exc:
+        assert "differ in question/category content" in str(exc)
+        assert "q1" in str(exc)
+    else:
+        raise AssertionError("Expected compare-systems to fail when matched rows differ in question/category.")

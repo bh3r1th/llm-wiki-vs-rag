@@ -276,9 +276,16 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
         ]
 
     monkeypatch.setattr("llm_wiki_vs_rag.eval.harness.run_rag_queries", _fake_rag)
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": "sha256:rag-snapshot"}),
+        encoding="utf-8",
+    )
     records = run_queries_for_system(
         config=AppConfig(project_root=tmp_path),
-        paths=ProjectPaths(project_root=tmp_path),
+        paths=paths,
         query_cases=[
             load_query_case("q1", "Q1"),
             load_query_case("q2", "Q2"),
@@ -291,7 +298,27 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
     assert [record.prompt_tokens for record in records] == [3, 5]
     assert [record.completion_tokens for record in records] == [4, 6]
     assert [record.total_tokens for record in records] == [7, 11]
-    assert all(record.metadata.get("corpus_snapshot") for record in records)
+    assert all(record.metadata.get("corpus_snapshot") == "sha256:rag-snapshot" for record in records)
+
+
+def test_run_queries_for_system_wiki_records_written_snapshot_identity(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "llm_wiki_vs_rag.eval.harness.run_wiki_queries",
+        lambda **_kwargs: [
+            GenerationResult(query_id="q1", answer="a1", mode="wiki", run_id="w1", latency_ms=1.1, artifact_dir="art/w1")
+        ],
+    )
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.wiki_dir / "snapshot.json").write_text(json.dumps({"snapshot_id": "sha256:wiki-snapshot"}), encoding="utf-8")
+
+    records = run_queries_for_system(
+        config=AppConfig(project_root=tmp_path),
+        paths=paths,
+        query_cases=[load_query_case("q1", "Q1")],
+        system="wiki",
+    )
+    assert records[0].metadata.get("corpus_snapshot") == "sha256:wiki-snapshot"
 
 
 def load_query_case(query_id: str, question: str):
@@ -435,5 +462,18 @@ def test_rag_snapshot_resolver_ignores_legacy_manifest_locations(tmp_path):
     (paths.artifacts_dir / "manifest.json").write_text('{"snapshot_id": "legacy-root"}', encoding="utf-8")
     (paths.artifacts_dir / "rag_index.manifest.json").write_text('{"snapshot_id": "legacy-rag"}', encoding="utf-8")
 
-    snapshot = resolve_corpus_snapshot_identity(paths=paths, system="rag")
-    assert snapshot == str((paths.artifacts_dir / "rag_index" / "manifest.json").resolve())
+    try:
+        resolve_corpus_snapshot_identity(paths=paths, system="rag")
+    except ValueError as exc:
+        assert "Missing canonical snapshot manifest for rag" in str(exc)
+    else:
+        raise AssertionError("Expected snapshot resolver to fail when canonical rag snapshot manifest is missing.")
+
+
+def test_wiki_snapshot_resolver_uses_canonical_manifest_path(tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.wiki_dir / "snapshot.json").write_text('{"snapshot_id": "sha256:wiki-snapshot-001"}', encoding="utf-8")
+
+    snapshot = resolve_corpus_snapshot_identity(paths=paths, system="wiki")
+    assert snapshot == "sha256:wiki-snapshot-001"

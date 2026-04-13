@@ -9,7 +9,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from llm_wiki_vs_rag.config import AppConfig
-from llm_wiki_vs_rag.data.load_docs import load_source_documents
+from llm_wiki_vs_rag.data.load_docs import fingerprint_document_batch, load_source_documents
 from llm_wiki_vs_rag.llm.client import LLMClient
 from llm_wiki_vs_rag.models import GenerationResult, QueryCase
 from llm_wiki_vs_rag.paths import ProjectPaths
@@ -61,12 +61,13 @@ def _write_query_artifacts(
 def build_rag_index(config: AppConfig, paths: ProjectPaths):
     """Build and persist a local RAG index from source documents."""
     batch = load_source_documents(paths.raw_dir)
+    snapshot_id = fingerprint_document_batch(batch)
     index = build_in_memory_index(
         batch=batch,
         chunk_size_chars=config.rag.chunk_size,
         chunk_overlap_chars=config.rag.chunk_overlap,
     )
-    persist_index(index=index, artifacts_dir=paths.artifacts_dir)
+    persist_index(index=index, artifacts_dir=paths.artifacts_dir, snapshot_id=snapshot_id)
     return index
 
 
