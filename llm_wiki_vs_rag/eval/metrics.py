@@ -30,43 +30,49 @@ def _validate_contradiction_invariants(records: list[EvaluationRecord]) -> None:
 
 
 def _validate_phase_cohort_alignment(records: list[EvaluationRecord]) -> None:
-    grouped: dict[tuple[str, str], list[EvaluationRecord]] = defaultdict(list)
+    grouped: dict[str, list[EvaluationRecord]] = defaultdict(list)
     for record in records:
-        grouped[(record.system, record.category)].append(record)
+        grouped[record.system].append(record)
 
     mismatches: list[dict[str, object]] = []
-    for (system, category), bucket in sorted(grouped.items()):
-        phase_1 = {
-            (record.query_id, record.question, record.category)
-            for record in bucket
-            if record.phase == "phase_1"
-        }
-        phase_2 = {
-            (record.query_id, record.question, record.category)
-            for record in bucket
-            if record.phase == "phase_2"
-        }
-        if phase_1 == phase_2:
+    for system, bucket in sorted(grouped.items()):
+        phase_1_by_query = {record.query_id: record for record in bucket if record.phase == "phase_1"}
+        phase_2_by_query = {record.query_id: record for record in bucket if record.phase == "phase_2"}
+        phase_1_ids = set(phase_1_by_query)
+        phase_2_ids = set(phase_2_by_query)
+        missing_in_phase_2 = sorted(phase_1_ids - phase_2_ids)
+        extra_in_phase_2 = sorted(phase_2_ids - phase_1_ids)
+        mismatched = []
+        for query_id in sorted(phase_1_ids & phase_2_ids):
+            phase_1_record = phase_1_by_query[query_id]
+            phase_2_record = phase_2_by_query[query_id]
+            if (
+                phase_1_record.question != phase_2_record.question
+                or phase_1_record.category != phase_2_record.category
+            ):
+                mismatched.append(
+                    {
+                        "query_id": query_id,
+                        "phase_1_question": phase_1_record.question,
+                        "phase_2_question": phase_2_record.question,
+                        "phase_1_category": phase_1_record.category,
+                        "phase_2_category": phase_2_record.category,
+                    }
+                )
+        if not missing_in_phase_2 and not extra_in_phase_2 and not mismatched:
             continue
-        only_phase_1 = sorted(phase_1 - phase_2)
-        only_phase_2 = sorted(phase_2 - phase_1)
         mismatches.append(
             {
                 "system": system,
-                "category": category,
-                "phase_1_only_sample": [
-                    {"query_id": qid, "question": question, "category": cat}
-                    for qid, question, cat in only_phase_1[:3]
-                ],
-                "phase_2_only_sample": [
-                    {"query_id": qid, "question": question, "category": cat}
-                    for qid, question, cat in only_phase_2[:3]
-                ],
+                "missing_in_phase_2_sample": missing_in_phase_2[:3],
+                "extra_in_phase_2_sample": extra_in_phase_2[:3],
+                "mismatched_sample": mismatched[:3],
             }
         )
     if mismatches:
         raise ValueError(
-            "Phase drift requires identical phase_1 and phase_2 query cohorts by (query_id, question, category). "
+            "Phase drift requires equivalent phase_1 and phase_2 query cohorts within each system by query_id "
+            "with stable question/category content. "
             f"mismatch_sample={mismatches[:5]}"
         )
 
