@@ -23,11 +23,11 @@ class ProjectPaths:
 
     @property
     def index_md(self) -> Path:
-        return self.wiki_dir / "index.md"
+        return self.project_root / "index.md"
 
     @property
     def log_md(self) -> Path:
-        return self.artifacts_dir / "log.md"
+        return self.project_root / "log.md"
 
     def ensure(self) -> None:
         """Create required directories and base files if absent."""

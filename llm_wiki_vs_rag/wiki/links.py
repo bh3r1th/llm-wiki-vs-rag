@@ -1,13 +1,37 @@
-"""Wiki link helpers."""
+"""Wiki link helpers for markdown wikilinks."""
 
-from llm_wiki_vs_rag.models import WikiPage
+from __future__ import annotations
+
+import re
+
+WIKILINK_PATTERN = re.compile(r"\[\[([^\[\]|]+)(?:\|[^\]]+)?\]\]")
 
 
-def build_page_links(pages: list[WikiPage], max_links_per_page: int) -> list[WikiPage]:
-    """Assign deterministic links between pages."""
-    page_ids = [page.page_id for page in pages]
-    updated: list[WikiPage] = []
-    for page in pages:
-        links = [pid for pid in page_ids if pid != page.page_id][:max_links_per_page]
-        updated.append(page.model_copy(update={"links": links}))
-    return updated
+def extract_wikilinks(markdown_text: str) -> list[str]:
+    """Extract unique wikilink targets from markdown in appearance order."""
+    seen: set[str] = set()
+    links: list[str] = []
+    for match in WIKILINK_PATTERN.finditer(markdown_text):
+        target = match.group(1).strip()
+        if not target or target in seen:
+            continue
+        seen.add(target)
+        links.append(target)
+    return links
+
+
+def ensure_related_links_section(markdown_text: str, links: list[str]) -> str:
+    """Ensure markdown has a `Related Pages` section reflecting wikilinks."""
+    if not links:
+        return markdown_text
+
+    section_header = "## Related Pages"
+    link_lines = "\n".join(f"- [[{link}]]" for link in links)
+
+    if section_header not in markdown_text:
+        suffix = "\n\n" if markdown_text.strip() else ""
+        return f"{markdown_text.rstrip()}{suffix}{section_header}\n{link_lines}\n"
+
+    pattern = re.compile(r"(?ms)^## Related Pages\n.*?(?=\n## |\Z)")
+    replacement = f"## Related Pages\n{link_lines}\n"
+    return pattern.sub(replacement, markdown_text, count=1)
