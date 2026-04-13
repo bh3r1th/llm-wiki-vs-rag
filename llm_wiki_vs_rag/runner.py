@@ -20,6 +20,7 @@ from llm_wiki_vs_rag.eval.harness import (
     run_queries_for_system,
     save_query_cases,
     save_run_outputs,
+    write_manual_label_template_from_run_outputs,
 )
 from llm_wiki_vs_rag.eval.report import write_reports
 from llm_wiki_vs_rag.data.corpus_freeze import write_corpus_manifest
@@ -375,5 +376,12 @@ def run_command(command: str, config: AppConfig, **kwargs: str | None) -> None:
         labels = load_manual_labels(labels_file)
         records = merge_outputs_with_labels(outputs, labels)
         write_reports(records=records, output_dir=output_dir)
+    elif command == "make-label-template":
+        run_file = Path(str(kwargs["run_file"]))
+        output_file = Path(str(kwargs["output_file"]))
+        if run_file.suffix != ".jsonl":
+            raise ValueError(f"Manual label template input must be JSONL (.jsonl). got={run_file.name}")
+        run_outputs = load_run_outputs(run_file)
+        write_manual_label_template_from_run_outputs(run_outputs=run_outputs, output_path=output_file)
     else:
         raise ValueError(f"Unsupported command: {command}")
