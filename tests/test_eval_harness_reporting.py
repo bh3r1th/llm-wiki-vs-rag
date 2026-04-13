@@ -269,10 +269,17 @@ def load_manual_labels_from_text(csv_payload: str):
 
 
 def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypatch, tmp_path):
+    artifact_one = tmp_path / "art" / "1"
+    artifact_two = tmp_path / "art" / "2"
+    artifact_one.mkdir(parents=True, exist_ok=True)
+    artifact_two.mkdir(parents=True, exist_ok=True)
+    (artifact_one / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_two / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+
     def _fake_rag(**_kwargs):
         return [
-            GenerationResult(query_id="q1", answer="a1", mode="rag", run_id="r1", latency_ms=11.1, artifact_dir="art/1", prompt_tokens=3, completion_tokens=4, total_tokens=7),
-            GenerationResult(query_id="q2", answer="a2", mode="rag", run_id="r2", latency_ms=22.2, artifact_dir="art/2", prompt_tokens=5, completion_tokens=6, total_tokens=11),
+            GenerationResult(query_id="q1", answer="a1", mode="rag", run_id="r1", latency_ms=11.1, artifact_dir=str(artifact_one), prompt_tokens=3, completion_tokens=4, total_tokens=7),
+            GenerationResult(query_id="q2", answer="a2", mode="rag", run_id="r2", latency_ms=22.2, artifact_dir=str(artifact_two), prompt_tokens=5, completion_tokens=6, total_tokens=11),
         ]
 
     monkeypatch.setattr("llm_wiki_vs_rag.eval.harness.run_rag_queries", _fake_rag)
@@ -302,10 +309,13 @@ def test_run_queries_for_system_preserves_per_query_latency_and_run_id(monkeypat
 
 
 def test_run_queries_for_system_wiki_records_written_snapshot_identity(monkeypatch, tmp_path):
+    artifact_dir = tmp_path / "art" / "w1"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:wiki-snapshot"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_wiki_queries",
         lambda **_kwargs: [
-            GenerationResult(query_id="q1", answer="a1", mode="wiki", run_id="w1", latency_ms=1.1, artifact_dir="art/w1")
+            GenerationResult(query_id="q1", answer="a1", mode="wiki", run_id="w1", latency_ms=1.1, artifact_dir=str(artifact_dir))
         ],
     )
     paths = ProjectPaths(project_root=tmp_path)
@@ -322,11 +332,17 @@ def test_run_queries_for_system_wiki_records_written_snapshot_identity(monkeypat
 
 
 def test_run_queries_for_system_keeps_phase_identity_when_query_id_repeats(monkeypatch, tmp_path):
+    artifact_one = tmp_path / "art" / "repeat-1"
+    artifact_two = tmp_path / "art" / "repeat-2"
+    artifact_one.mkdir(parents=True, exist_ok=True)
+    artifact_two.mkdir(parents=True, exist_ok=True)
+    (artifact_one / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
+    (artifact_two / "metadata.json").write_text(json.dumps({"corpus_snapshot": "sha256:rag-snapshot"}), encoding="utf-8")
     monkeypatch.setattr(
         "llm_wiki_vs_rag.eval.harness.run_rag_queries",
         lambda **_kwargs: [
-            GenerationResult(query_id="q1", answer="a1", mode="rag"),
-            GenerationResult(query_id="q1", answer="a2", mode="rag"),
+            GenerationResult(query_id="q1", answer="a1", mode="rag", artifact_dir=str(artifact_one)),
+            GenerationResult(query_id="q1", answer="a2", mode="rag", artifact_dir=str(artifact_two)),
         ],
     )
     paths = ProjectPaths(project_root=tmp_path)
@@ -380,6 +396,37 @@ def test_run_queries_for_system_fails_on_snapshot_mismatch_in_artifact_metadata(
         assert "Run snapshot attribution mismatch" in str(exc)
     else:
         raise AssertionError("Expected run snapshot attribution mismatch to fail fast.")
+
+
+def test_run_queries_for_system_fails_when_artifact_snapshot_missing(monkeypatch, tmp_path):
+    artifact_dir = tmp_path / "artifacts" / "rag_runs" / "run-1"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "metadata.json").write_text(json.dumps({"query_id": "q1"}), encoding="utf-8")
+    monkeypatch.setattr(
+        "llm_wiki_vs_rag.eval.harness.run_rag_queries",
+        lambda **_kwargs: [
+            GenerationResult(query_id="q1", answer="a1", mode="rag", artifact_dir=str(artifact_dir)),
+        ],
+    )
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": "sha256:canonical-snapshot"}),
+        encoding="utf-8",
+    )
+
+    try:
+        run_queries_for_system(
+            config=AppConfig(project_root=tmp_path),
+            paths=paths,
+            query_cases=[load_query_case("q1", "Q1")],
+            system="rag",
+        )
+    except ValueError as exc:
+        assert "Missing corpus_snapshot in per-query artifact metadata" in str(exc)
+    else:
+        raise AssertionError("Expected missing artifact corpus_snapshot to fail fast.")
 
 
 def load_query_case(query_id: str, question: str):

@@ -29,8 +29,6 @@ class RAGConfig(BaseModel):
 class WikiConfig(BaseModel):
     """Configuration for ingest-time synthesis (LLM Wiki)."""
 
-    page_token_budget: int = Field(default=1200, ge=1)
-    max_links_per_page: int = Field(default=5, ge=0)
     query_top_k: int = Field(default=5, ge=1)
 
 

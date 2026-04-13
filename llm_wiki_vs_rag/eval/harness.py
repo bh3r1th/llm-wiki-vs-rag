@@ -108,26 +108,44 @@ def run_queries_for_system(
     snapshot_identity = resolve_corpus_snapshot_identity(paths=paths, system=system)
 
     if system == "rag":
-        results = run_rag_queries(config=config, paths=paths, query_cases=query_inputs)
+        results = run_rag_queries(
+            config=config,
+            paths=paths,
+            query_cases=query_inputs,
+            corpus_snapshot=snapshot_identity,
+        )
     elif system == "wiki":
-        results = run_wiki_queries(config=config, paths=paths, query_cases=query_inputs)
+        results = run_wiki_queries(
+            config=config,
+            paths=paths,
+            query_cases=query_inputs,
+            corpus_snapshot=snapshot_identity,
+        )
     else:
         raise ValueError(f"Unsupported system: {system}")
 
-    run_metadata = {"corpus_snapshot": snapshot_identity}
     seen_artifact_snapshots: set[str] = set()
     for result in results:
         if not result.artifact_dir:
-            continue
+            raise ValueError(
+                "Missing artifact_dir for benchmark output row: "
+                f"system={system}, query_id={result.query_id}, run_id={result.run_id}."
+            )
         metadata_path = Path(result.artifact_dir) / "metadata.json"
         if not metadata_path.exists():
-            continue
+            raise ValueError(
+                "Missing per-query artifact metadata for benchmark output row: "
+                f"system={system}, query_id={result.query_id}, run_id={result.run_id}, path={metadata_path}."
+            )
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
             raise ValueError(f"Invalid artifact metadata payload for system={system}: {metadata_path}")
         artifact_snapshot = str(payload.get("corpus_snapshot", "")).strip()
         if not artifact_snapshot:
-            continue
+            raise ValueError(
+                "Missing corpus_snapshot in per-query artifact metadata: "
+                f"system={system}, query_id={result.query_id}, run_id={result.run_id}, path={metadata_path}."
+            )
         seen_artifact_snapshots.add(artifact_snapshot)
         if artifact_snapshot != snapshot_identity:
             raise ValueError(
@@ -167,7 +185,6 @@ def run_queries_for_system(
                     "used_context_ids": result.used_context_ids,
                     "artifact_dir": result.artifact_dir,
                     "corpus_snapshot": snapshot_identity,
-                    "run_corpus_snapshot": run_metadata["corpus_snapshot"],
                 },
             )
         )

@@ -23,6 +23,15 @@ def _new_run_id(prefix: str) -> str:
     return f"{prefix}-{timestamp}-{uuid4().hex[:8]}"
 
 
+def _resolve_rag_snapshot_identity(paths: ProjectPaths) -> str:
+    manifest_path = paths.artifacts_dir / "rag_index" / "manifest.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    snapshot_id = str(payload.get("snapshot_id", "")).strip()
+    if not snapshot_id:
+        raise ValueError(f"Missing snapshot_id in canonical snapshot manifest for rag: {manifest_path}")
+    return snapshot_id
+
+
 def _write_query_artifacts(
     paths: ProjectPaths,
     run_id: str,
@@ -30,6 +39,8 @@ def _write_query_artifacts(
     prompt: str,
     answer: str,
     retrieved_chunks: list,
+    requested_top_k: int,
+    corpus_snapshot: str,
     prompt_tokens: int,
     completion_tokens: int,
     total_tokens: int,
@@ -47,7 +58,9 @@ def _write_query_artifacts(
         "run_id": run_id,
         "query_id": query.query_id,
         "question": query.question,
-        "top_k": len(retrieved_chunks),
+        "requested_top_k": requested_top_k,
+        "returned_top_k": len(retrieved_chunks),
+        "corpus_snapshot": corpus_snapshot,
         "token_usage": {
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
@@ -71,12 +84,18 @@ def build_rag_index(config: AppConfig, paths: ProjectPaths):
     return index
 
 
-def answer_rag_query(config: AppConfig, paths: ProjectPaths, query: QueryCase) -> GenerationResult:
+def answer_rag_query(
+    config: AppConfig,
+    paths: ProjectPaths,
+    query: QueryCase,
+    corpus_snapshot: str | None = None,
+) -> GenerationResult:
     """Answer a single query with the persisted RAG baseline."""
     start = perf_counter()
     index = load_index(paths.artifacts_dir)
     llm_client = LLMClient(config=config.llm)
-    chunks = retrieve_top_k(index=index, query=query.question, top_k=config.retrieval_top_k())
+    requested_top_k = config.retrieval_top_k()
+    chunks = retrieve_top_k(index=index, query=query.question, top_k=requested_top_k)
     prompt = build_rag_prompt(question=query.question, chunks=chunks)
     llm_response = llm_client.generate_response(prompt, require_token_usage=True)
     answer = llm_response.text
@@ -88,6 +107,8 @@ def answer_rag_query(config: AppConfig, paths: ProjectPaths, query: QueryCase) -
         prompt=prompt,
         answer=answer,
         retrieved_chunks=chunks,
+        requested_top_k=requested_top_k,
+        corpus_snapshot=corpus_snapshot or _resolve_rag_snapshot_identity(paths),
         prompt_tokens=llm_response.token_usage.prompt_tokens,
         completion_tokens=llm_response.token_usage.completion_tokens,
         total_tokens=llm_response.token_usage.total_tokens,
@@ -108,6 +129,14 @@ def answer_rag_query(config: AppConfig, paths: ProjectPaths, query: QueryCase) -
     )
 
 
-def run_rag_queries(config: AppConfig, paths: ProjectPaths, query_cases: list[QueryCase]) -> list[GenerationResult]:
+def run_rag_queries(
+    config: AppConfig,
+    paths: ProjectPaths,
+    query_cases: list[QueryCase],
+    corpus_snapshot: str | None = None,
+) -> list[GenerationResult]:
     """Run the RAG baseline for a query set."""
-    return [answer_rag_query(config=config, paths=paths, query=query) for query in query_cases]
+    return [
+        answer_rag_query(config=config, paths=paths, query=query, corpus_snapshot=corpus_snapshot)
+        for query in query_cases
+    ]

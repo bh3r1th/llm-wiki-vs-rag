@@ -128,6 +128,9 @@ def test_pipeline_saves_query_artifacts(tmp_path):
 
     metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["query_id"] == "q1"
+    assert metadata["corpus_snapshot"] == "sha256:test"
+    assert metadata["requested_top_k"] == config.rag.top_k
+    assert metadata["returned_top_k"] <= metadata["requested_top_k"]
 
 
 def test_build_rag_index_writes_canonical_snapshot_identity(tmp_path):
