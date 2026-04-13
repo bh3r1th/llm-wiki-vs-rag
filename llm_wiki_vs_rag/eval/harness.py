@@ -139,10 +139,25 @@ def run_queries_for_system(
             "Mixed-phase query execution is not allowed without explicit phase binding. "
             f"phases={sorted(phases_present)}."
         )
-    effective_phase = target_phase
-    if effective_phase is None and len(phases_present) == 1:
-        effective_phase = next(iter(phases_present))
-    effective_cases = [case for case in query_cases if effective_phase is None or case.phase == effective_phase]
+    if target_phase is not None:
+        mismatched_cases = [case for case in query_cases if case.phase != target_phase]
+        if mismatched_cases:
+            mismatch_sample = [
+                {"query_id": case.query_id, "phase": case.phase}
+                for case in mismatched_cases[:5]
+            ]
+            mismatched_phases = sorted({case.phase for case in mismatched_cases})
+            raise ValueError(
+                "Phase-targeted benchmark execution requires all query rows to match the requested phase. "
+                f"target_phase={target_phase}, mismatched_phases={mismatched_phases}, "
+                f"mismatch_sample={mismatch_sample}."
+            )
+        effective_cases = query_cases
+    else:
+        effective_phase = None
+        if len(phases_present) == 1:
+            effective_phase = next(iter(phases_present))
+        effective_cases = [case for case in query_cases if effective_phase is None or case.phase == effective_phase]
     if not effective_cases:
         raise ValueError(
             "No query rows match requested phase binding. "

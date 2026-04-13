@@ -355,3 +355,86 @@ def test_wiki_query_fails_if_raw_corpus_drifted_since_ingest(monkeypatch, tmp_pa
         assert "Raw corpus snapshot drift detected" in str(exc)
     else:
         raise AssertionError("Expected Wiki queries to fail when raw corpus drift is detected.")
+
+
+def test_rag_query_fails_if_runtime_execution_fingerprint_differs_from_manifest(monkeypatch, tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    config = AppConfig(project_root=tmp_path, llm=LLMConfig(mock_mode=True, mock_response="ok"))
+    (paths.raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
+    snapshot = fingerprint_document_batch(load_source_documents(paths.raw_dir))
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps({"snapshot_id": snapshot, "execution_fingerprint": "sha256:stale-fingerprint"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.pipeline.load_index", lambda _artifacts_dir: object())
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.pipeline.retrieve_top_k", lambda **_kwargs: [])
+
+    try:
+        run_rag_queries(config=config, paths=paths, query_cases=[QueryCase(query_id="q1", question="Q?")])
+    except ValueError as exc:
+        assert "Execution fingerprint mismatch at query runtime" in str(exc)
+        assert "system=rag" in str(exc)
+        assert "manifest_fingerprint=sha256:stale-fingerprint" in str(exc)
+    else:
+        raise AssertionError("Expected RAG queries to fail when runtime execution fingerprint mismatches manifest.")
+
+
+def test_wiki_query_fails_if_runtime_execution_fingerprint_differs_from_manifest(monkeypatch, tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    config = AppConfig(project_root=tmp_path, llm=LLMConfig(mock_mode=True, mock_response="ok"))
+    (paths.raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
+    snapshot = fingerprint_document_batch(load_source_documents(paths.raw_dir))
+    (paths.wiki_dir / "snapshot.json").write_text(
+        json.dumps({"snapshot_id": snapshot, "execution_fingerprint": "sha256:stale-fingerprint"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.load_pages", lambda _wiki_dir: [])
+    monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.retrieve_wiki_pages", lambda pages, query, top_k: [])
+
+    try:
+        run_wiki_queries(config=config, paths=paths, query_cases=[QueryCase(query_id="q1", question="Q?")])
+    except ValueError as exc:
+        assert "Execution fingerprint mismatch at query runtime" in str(exc)
+        assert "system=wiki" in str(exc)
+        assert "manifest_fingerprint=sha256:stale-fingerprint" in str(exc)
+    else:
+        raise AssertionError("Expected Wiki queries to fail when runtime execution fingerprint mismatches manifest.")
+
+
+def test_runtime_execution_fingerprint_mismatch_detects_model_top_k_and_chunking_drift(monkeypatch, tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.raw_dir / "001_doc.txt").write_text("alpha", encoding="utf-8")
+    snapshot = fingerprint_document_batch(load_source_documents(paths.raw_dir))
+    baseline = AppConfig(
+        project_root=tmp_path,
+        llm=LLMConfig(provider="openai-compatible", model_name="baseline-model", mock_mode=True, mock_response="ok"),
+        rag=RAGConfig(top_k=5, chunk_size=500, chunk_overlap=50),
+    )
+    drifted = AppConfig(
+        project_root=tmp_path,
+        llm=LLMConfig(provider="openai-compatible", model_name="new-model", mock_mode=True, mock_response="ok"),
+        rag=RAGConfig(top_k=7, chunk_size=700, chunk_overlap=10),
+    )
+    (paths.artifacts_dir / "rag_index").mkdir(parents=True, exist_ok=True)
+    (paths.artifacts_dir / "rag_index" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "snapshot_id": snapshot,
+                "execution_fingerprint": compute_execution_fingerprint(config=baseline, system="rag"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.pipeline.load_index", lambda _artifacts_dir: object())
+    monkeypatch.setattr("llm_wiki_vs_rag.rag.pipeline.retrieve_top_k", lambda **_kwargs: [])
+
+    try:
+        run_rag_queries(config=drifted, paths=paths, query_cases=[QueryCase(query_id="q1", question="Q?")])
+    except ValueError as exc:
+        assert "Execution fingerprint mismatch at query runtime" in str(exc)
+    else:
+        raise AssertionError("Expected runtime fingerprint drift to fail for model/top_k/chunking changes.")
