@@ -6,9 +6,14 @@ from llm_wiki_vs_rag.models import DocumentBatch, SourceDocument
 
 
 def load_source_documents(raw_dir: Path) -> DocumentBatch:
-    """Load .txt files from raw directory into typed source documents."""
+    """Load .txt/.md files from raw directory in deterministic filename order."""
     documents: list[SourceDocument] = []
-    for file_path in sorted(raw_dir.glob("*.txt")):
+    candidate_paths = sorted(
+        [*raw_dir.glob("*.txt"), *raw_dir.glob("*.md")],
+        key=lambda path: path.name,
+    )
+
+    for file_path in candidate_paths:
         text = file_path.read_text(encoding="utf-8").strip()
         if not text:
             continue
@@ -17,7 +22,8 @@ def load_source_documents(raw_dir: Path) -> DocumentBatch:
                 doc_id=file_path.stem,
                 source_path=file_path,
                 text=text,
-                metadata={"filename": file_path.name},
+                metadata={"filename": file_path.name, "suffix": file_path.suffix.lower()},
             )
         )
+
     return DocumentBatch(documents=documents)
