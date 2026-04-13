@@ -9,6 +9,7 @@ from pathlib import Path
 from llm_wiki_vs_rag.eval.harness import (
     load_manual_labels,
     merge_outputs_with_labels,
+    resolve_corpus_snapshot_identity,
     run_queries_for_system,
 )
 from llm_wiki_vs_rag.eval.metrics import compute_drift, summarize_records
@@ -415,3 +416,24 @@ def test_repeated_runs_within_same_second_have_distinct_run_ids():
 
     assert rag_first != rag_second
     assert wiki_first != wiki_second
+
+
+def test_rag_snapshot_resolver_uses_canonical_manifest_path(tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    manifest_path = paths.artifacts_dir / "rag_index" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text('{"snapshot_id": "rag-snapshot-001"}', encoding="utf-8")
+
+    snapshot = resolve_corpus_snapshot_identity(paths=paths, system="rag")
+    assert snapshot == "rag-snapshot-001"
+
+
+def test_rag_snapshot_resolver_ignores_legacy_manifest_locations(tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.artifacts_dir / "manifest.json").write_text('{"snapshot_id": "legacy-root"}', encoding="utf-8")
+    (paths.artifacts_dir / "rag_index.manifest.json").write_text('{"snapshot_id": "legacy-rag"}', encoding="utf-8")
+
+    snapshot = resolve_corpus_snapshot_identity(paths=paths, system="rag")
+    assert snapshot == str((paths.artifacts_dir / "rag_index" / "manifest.json").resolve())

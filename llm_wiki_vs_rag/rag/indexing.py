@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,16 +30,31 @@ def _embed_text(text: str, dim: int = EMBED_DIM) -> np.ndarray:
     """Create a deterministic local embedding using hashed token counts."""
     vector = np.zeros(dim, dtype=np.float32)
     for token in text.lower().split():
-        idx = hash(token) % dim
+        digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+        idx = int.from_bytes(digest, byteorder="big") % dim
         vector[idx] += 1.0
+    return _normalize_vector(vector)
+
+
+def _normalize_vector(vector: np.ndarray) -> np.ndarray:
+    """Normalize one embedding vector for exact cosine scoring."""
     norm = float(np.linalg.norm(vector))
     if norm > 0:
         vector /= norm
     return vector
 
 
+def _normalize_matrix(embeddings: np.ndarray) -> np.ndarray:
+    """Normalize each embedding row for exact cosine scoring."""
+    if embeddings.size == 0:
+        return embeddings.astype(np.float32)
+    row_norms = np.linalg.norm(embeddings, axis=1, keepdims=True).astype(np.float32)
+    row_norms[row_norms == 0.0] = 1.0
+    return (embeddings / row_norms).astype(np.float32)
+
+
 def _embed_texts(texts: list[str], dim: int = EMBED_DIM) -> np.ndarray:
-    return np.vstack([_embed_text(text, dim=dim) for text in texts]).astype(np.float32)
+    return _normalize_matrix(np.vstack([_embed_text(text, dim=dim) for text in texts]).astype(np.float32))
 
 
 def build_in_memory_index(
@@ -59,19 +75,7 @@ def build_in_memory_index(
 
     embeddings = _embed_texts([chunk.text for chunk in chunks]) if chunks else np.zeros((0, EMBED_DIM), dtype=np.float32)
 
-    backend = "numpy"
-    try:
-        import faiss  # type: ignore
-
-        if embeddings.shape[0] > 0:
-            index = faiss.IndexFlatIP(embeddings.shape[1])
-            index.add(embeddings)
-            _ = index
-        backend = "faiss"
-    except ImportError:
-        backend = "numpy"
-
-    return RAGIndex(chunks=chunks, embeddings=embeddings, backend=backend)
+    return RAGIndex(chunks=chunks, embeddings=embeddings, backend="numpy")
 
 
 def persist_index(index: RAGIndex, artifacts_dir: Path) -> Path:
@@ -79,7 +83,8 @@ def persist_index(index: RAGIndex, artifacts_dir: Path) -> Path:
     index_dir = artifacts_dir / INDEX_DIRNAME
     index_dir.mkdir(parents=True, exist_ok=True)
 
-    np.save(index_dir / "embeddings.npy", index.embeddings)
+    normalized_embeddings = _normalize_matrix(index.embeddings.astype(np.float32))
+    np.save(index_dir / "embeddings.npy", normalized_embeddings)
     metadata_path = index_dir / "chunk_metadata.jsonl"
     with metadata_path.open("w", encoding="utf-8") as handle:
         for chunk in index.chunks:
@@ -87,8 +92,8 @@ def persist_index(index: RAGIndex, artifacts_dir: Path) -> Path:
             handle.write("\n")
 
     manifest = {
-        "backend": index.backend,
-        "embedding_dim": int(index.embeddings.shape[1]) if index.embeddings.ndim == 2 else EMBED_DIM,
+        "backend": "numpy",
+        "embedding_dim": int(normalized_embeddings.shape[1]) if normalized_embeddings.ndim == 2 else EMBED_DIM,
         "num_chunks": len(index.chunks),
     }
     (index_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -98,7 +103,7 @@ def persist_index(index: RAGIndex, artifacts_dir: Path) -> Path:
 def load_index(artifacts_dir: Path) -> RAGIndex:
     """Load previously persisted RAG index artifacts."""
     index_dir = artifacts_dir / INDEX_DIRNAME
-    embeddings = np.load(index_dir / "embeddings.npy")
+    embeddings = _normalize_matrix(np.load(index_dir / "embeddings.npy").astype(np.float32))
 
     chunks: list[RetrievedChunk] = []
     with (index_dir / "chunk_metadata.jsonl").open("r", encoding="utf-8") as handle:
