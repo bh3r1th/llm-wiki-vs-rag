@@ -29,7 +29,14 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def ingest_one_document(paths: ProjectPaths, llm_client: LLMClient, document: SourceDocument) -> dict:
+def ingest_one_document(
+    paths: ProjectPaths,
+    llm_client: LLMClient,
+    document: SourceDocument,
+    *,
+    ingest_run_id: str,
+    corpus_snapshot: str,
+) -> dict:
     """Ingest one raw document against existing wiki state."""
     timestamp = _utc_timestamp()
     current_pages = load_pages(paths.wiki_dir)
@@ -83,7 +90,7 @@ def ingest_one_document(paths: ProjectPaths, llm_client: LLMClient, document: So
         log_note=llm_output["log_note"],
     )
 
-    ingest_artifact_dir = paths.artifacts_dir / "wiki_ingest" / document.doc_id
+    ingest_artifact_dir = paths.artifacts_dir / "wiki_ingest" / ingest_run_id / document.doc_id
     ingest_artifact_dir.mkdir(parents=True, exist_ok=True)
     _write_json(ingest_artifact_dir / "selected_pages.json", [page.title for page in selected_pages])
     (ingest_artifact_dir / "prompt.txt").write_text(prompt, encoding="utf-8")
@@ -92,6 +99,8 @@ def ingest_one_document(paths: ProjectPaths, llm_client: LLMClient, document: So
         ingest_artifact_dir / "applied_changes.json",
         {
             "timestamp": timestamp,
+            "ingest_run_id": ingest_run_id,
+            "corpus_snapshot": corpus_snapshot,
             "doc_id": document.doc_id,
             "pages_created": created_titles,
             "pages_updated": updated_titles,

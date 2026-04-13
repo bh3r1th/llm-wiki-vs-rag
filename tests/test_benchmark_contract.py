@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import inspect
 from pathlib import Path
 
@@ -117,3 +118,31 @@ def test_snapshot_fingerprint_is_content_based_across_different_roots(tmp_path):
     batch_b = load_source_documents(root_b)
 
     assert fingerprint_document_batch(batch_a) == fingerprint_document_batch(batch_b)
+
+
+def test_wiki_ingest_artifacts_preserve_rerun_history_for_same_doc_id(monkeypatch, tmp_path):
+    paths = ProjectPaths(project_root=tmp_path)
+    paths.ensure()
+    (paths.raw_dir / "001.txt").write_text("alpha", encoding="utf-8")
+
+    def _fake_ingest_one_document(*, paths, llm_client, document, ingest_run_id, corpus_snapshot):
+        artifact_dir = paths.artifacts_dir / "wiki_ingest" / ingest_run_id / document.doc_id
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        (artifact_dir / "applied_changes.json").write_text(
+            json.dumps({"doc_id": document.doc_id, "ingest_run_id": ingest_run_id, "corpus_snapshot": corpus_snapshot}),
+            encoding="utf-8",
+        )
+        return {"doc_id": document.doc_id}
+
+    monkeypatch.setattr("llm_wiki_vs_rag.wiki.pipeline.ingest_one_document", _fake_ingest_one_document)
+
+    ingest_wiki(config=AppConfig(project_root=tmp_path), paths=paths)
+    ingest_wiki(config=AppConfig(project_root=tmp_path), paths=paths)
+
+    doc_artifacts = list((paths.artifacts_dir / "wiki_ingest").glob("*/001/applied_changes.json"))
+    assert len(doc_artifacts) == 2
+    run_ids = {
+        json.loads(artifact.read_text(encoding="utf-8"))["ingest_run_id"]
+        for artifact in doc_artifacts
+    }
+    assert len(run_ids) == 2
