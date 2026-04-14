@@ -1,0 +1,46 @@
+You are answering a question strictly from provided context chunks.
+Rules:
+1) Answer only from the context below.
+2) If context is insufficient, reply exactly: INSUFFICIENT_EVIDENCE.
+3) Do not invent latest-state, current-status, or time-sensitive claims unless directly supported by context.
+
+Question:
+What is the title of the arXiv paper that introduces the Transformer architecture?
+
+Context:
+[chunk_id=068_financial_clean_001:0 | doc_id=068_financial_clean_001 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/068_financial_clean_001.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 317}]
+doc_id: 068
+source: financial_clean
+title: Benchmark corpus financial_clean document 1
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 1 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=057_policy_023:0 | doc_id=057_policy_023 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/057_policy_023.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 283}]
+doc_id: 057
+source: policy
+title: Benchmark corpus policy document 23
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 23 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=051_policy_017:0 | doc_id=051_policy_017 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/051_policy_017.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 283}]
+doc_id: 051
+source: policy
+title: Benchmark corpus policy document 17
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 17 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=077_financial_clean_010:0 | doc_id=077_financial_clean_010 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/077_financial_clean_010.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 319}]
+doc_id: 077
+source: financial_clean
+title: Benchmark corpus financial_clean document 10
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 10 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=078_financial_clean_011:0 | doc_id=078_financial_clean_011 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/078_financial_clean_011.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 319}]
+doc_id: 078
+source: financial_clean
+title: Benchmark corpus financial_clean document 11
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 11 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+Answer:

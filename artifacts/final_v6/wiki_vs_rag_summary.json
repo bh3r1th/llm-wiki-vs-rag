@@ -1,0 +1,450 @@
+{
+  "summaries_by_system": [
+    {
+      "group_by": {
+        "system": "rag"
+      },
+      "total": 48,
+      "labeled_total": 48,
+      "avg_latency_ms": 120.374,
+      "avg_total_tokens": 2.0,
+      "metrics": {
+        "accuracy": {
+          "correct": 6,
+          "partial": 26,
+          "wrong": 16,
+          "correct_pct": 12.5,
+          "partial_pct": 54.17,
+          "wrong_pct": 33.33
+        },
+        "synthesis": {
+          "full": 16,
+          "incomplete": 16,
+          "failed": 16
+        },
+        "latest_state": {
+          "correct": 42,
+          "stale": 6,
+          "missed_update": 0,
+          "correct_pct": 87.5
+        },
+        "contradiction": {
+          "detected": 0,
+          "resolved": 0,
+          "resolved_applicable_total": 0,
+          "resolved_pct": null
+        },
+        "compression_loss": {
+          "none": 6,
+          "minor": 14,
+          "major": 28
+        },
+        "provenance_fidelity": {
+          "true": 0,
+          "false": 48,
+          "true_pct": 0.0
+        }
+      }
+    },
+    {
+      "group_by": {
+        "system": "wiki"
+      },
+      "total": 48,
+      "labeled_total": 48,
+      "avg_latency_ms": 2.215,
+      "avg_total_tokens": 2.0,
+      "metrics": {
+        "accuracy": {
+          "correct": 48,
+          "partial": 0,
+          "wrong": 0,
+          "correct_pct": 100.0,
+          "partial_pct": 0.0,
+          "wrong_pct": 0.0
+        },
+        "synthesis": {
+          "full": 48,
+          "incomplete": 0,
+          "failed": 0
+        },
+        "latest_state": {
+          "correct": 48,
+          "stale": 0,
+          "missed_update": 0,
+          "correct_pct": 100.0
+        },
+        "contradiction": {
+          "detected": 0,
+          "resolved": 0,
+          "resolved_applicable_total": 0,
+          "resolved_pct": null
+        },
+        "compression_loss": {
+          "none": 48,
+          "minor": 0,
+          "major": 0
+        },
+        "provenance_fidelity": {
+          "true": 0,
+          "false": 48,
+          "true_pct": 0.0
+        }
+      }
+    }
+  ],
+  "summaries_by_phase": [
+    {
+      "group_by": {
+        "phase": "phase_1"
+      },
+      "total": 48,
+      "labeled_total": 48,
+      "avg_latency_ms": 59.479,
+      "avg_total_tokens": 2.0,
+      "metrics": {
+        "accuracy": {
+          "correct": 30,
+          "partial": 13,
+          "wrong": 5,
+          "correct_pct": 62.5,
+          "partial_pct": 27.08,
+          "wrong_pct": 10.42
+        },
+        "synthesis": {
+          "full": 35,
+          "incomplete": 8,
+          "failed": 5
+        },
+        "latest_state": {
+          "correct": 48,
+          "stale": 0,
+          "missed_update": 0,
+          "correct_pct": 100.0
+        },
+        "contradiction": {
+          "detected": 0,
+          "resolved": 0,
+          "resolved_applicable_total": 0,
+          "resolved_pct": null
+        },
+        "compression_loss": {
+          "none": 30,
+          "minor": 7,
+          "major": 11
+        },
+        "provenance_fidelity": {
+          "true": 0,
+          "false": 48,
+          "true_pct": 0.0
+        }
+      }
+    },
+    {
+      "group_by": {
+        "phase": "phase_2"
+      },
+      "total": 48,
+      "labeled_total": 48,
+      "avg_latency_ms": 63.11,
+      "avg_total_tokens": 2.0,
+      "metrics": {
+        "accuracy": {
+          "correct": 24,
+          "partial": 13,
+          "wrong": 11,
+          "correct_pct": 50.0,
+          "partial_pct": 27.08,
+          "wrong_pct": 22.92
+        },
+        "synthesis": {
+          "full": 29,
+          "incomplete": 8,
+          "failed": 11
+        },
+        "latest_state": {
+          "correct": 42,
+          "stale": 6,
+          "missed_update": 0,
+          "correct_pct": 87.5
+        },
+        "contradiction": {
+          "detected": 0,
+          "resolved": 0,
+          "resolved_applicable_total": 0,
+          "resolved_pct": null
+        },
+        "compression_loss": {
+          "none": 24,
+          "minor": 7,
+          "major": 17
+        },
+        "provenance_fidelity": {
+          "true": 0,
+          "false": 48,
+          "true_pct": 0.0
+        }
+      }
+    }
+  ],
+  "summaries_by_category": [
+    {
+      "group_by": {
+        "category": "contradiction"
+      },
+      "total": 24,
+      "labeled_total": 24,
+      "avg_latency_ms": 80.544,
+      "avg_total_tokens": 2.0,
+      "metrics": {
+        "accuracy": {
+          "correct": 12,
+          "partial": 2,
+          "wrong": 10,
+          "correct_pct": 50.0,
+          "partial_pct": 8.33,
+          "wrong_pct": 41.67
+        },
+        "synthesis": {
+          "full": 12,
+          "incomplete": 2,
+          "failed": 10
+        },
+        "latest_state": {
+          "correct": 24,
+          "stale": 0,
+          "missed_update": 0,
+          "correct_pct": 100.0
+        },
+        "contradiction": {
+          "detected": 0,
+          "resolved": 0,
+          "resolved_applicable_total": 0,
+          "resolved_pct": null
+        },
+        "compression_loss": {
+          "none": 12,
+          "minor": 2,
+          "major": 10
+        },
+        "provenance_fidelity": {
+          "true": 0,
+          "false": 24,
+          "true_pct": 0.0
+        }
+      }
+    },
+    {
+      "group_by": {
+        "category": "latest_state"
+      },
+      "total": 24,
+      "labeled_total": 24,
+      "avg_latency_ms": 61.896,
+      "avg_total_tokens": 2.0,
+      "metrics": {
+        "accuracy": {
+          "correct": 18,
+          "partial": 0,
+          "wrong": 6,
+          "correct_pct": 75.0,
+          "partial_pct": 0.0,
+          "wrong_pct": 25.0
+        },
+        "synthesis": {
+          "full": 18,
+          "incomplete": 0,
+          "failed": 6
+        },
+        "latest_state": {
+          "correct": 18,
+          "stale": 6,
+          "missed_update": 0,
+          "correct_pct": 75.0
+        },
+        "contradiction": {
+          "detected": 0,
+          "resolved": 0,
+          "resolved_applicable_total": 0,
+          "resolved_pct": null
+        },
+        "compression_loss": {
+          "none": 18,
+          "minor": 0,
+          "major": 6
+        },
+        "provenance_fidelity": {
+          "true": 0,
+          "false": 24,
+          "true_pct": 0.0
+        }
+      }
+    },
+    {
+      "group_by": {
+        "category": "lookup"
+      },
+      "total": 24,
+      "labeled_total": 24,
+      "avg_latency_ms": 39.231,
+      "avg_total_tokens": 2.0,
+      "metrics": {
+        "accuracy": {
+          "correct": 12,
+          "partial": 12,
+          "wrong": 0,
+          "correct_pct": 50.0,
+          "partial_pct": 50.0,
+          "wrong_pct": 0.0
+        },
+        "synthesis": {
+          "full": 22,
+          "incomplete": 2,
+          "failed": 0
+        },
+        "latest_state": {
+          "correct": 24,
+          "stale": 0,
+          "missed_update": 0,
+          "correct_pct": 100.0
+        },
+        "contradiction": {
+          "detected": 0,
+          "resolved": 0,
+          "resolved_applicable_total": 0,
+          "resolved_pct": null
+        },
+        "compression_loss": {
+          "none": 12,
+          "minor": 12,
+          "major": 0
+        },
+        "provenance_fidelity": {
+          "true": 0,
+          "false": 24,
+          "true_pct": 0.0
+        }
+      }
+    },
+    {
+      "group_by": {
+        "category": "synthesis"
+      },
+      "total": 24,
+      "labeled_total": 24,
+      "avg_latency_ms": 63.507,
+      "avg_total_tokens": 2.0,
+      "metrics": {
+        "accuracy": {
+          "correct": 12,
+          "partial": 12,
+          "wrong": 0,
+          "correct_pct": 50.0,
+          "partial_pct": 50.0,
+          "wrong_pct": 0.0
+        },
+        "synthesis": {
+          "full": 12,
+          "incomplete": 12,
+          "failed": 0
+        },
+        "latest_state": {
+          "correct": 24,
+          "stale": 0,
+          "missed_update": 0,
+          "correct_pct": 100.0
+        },
+        "contradiction": {
+          "detected": 0,
+          "resolved": 0,
+          "resolved_applicable_total": 0,
+          "resolved_pct": null
+        },
+        "compression_loss": {
+          "none": 12,
+          "minor": 0,
+          "major": 12
+        },
+        "provenance_fidelity": {
+          "true": 0,
+          "false": 24,
+          "true_pct": 0.0
+        }
+      }
+    }
+  ],
+  "drifts": [
+    {
+      "system": "rag",
+      "category": "contradiction",
+      "phase_1_count": 6,
+      "phase_2_count": 6,
+      "accuracy_correct_rate_delta": 0.0,
+      "latest_state_correct_rate_delta": 0.0,
+      "contradiction_resolved_rate_delta": null
+    },
+    {
+      "system": "rag",
+      "category": "latest_state",
+      "phase_1_count": 6,
+      "phase_2_count": 6,
+      "accuracy_correct_rate_delta": -1.0,
+      "latest_state_correct_rate_delta": -1.0,
+      "contradiction_resolved_rate_delta": null
+    },
+    {
+      "system": "rag",
+      "category": "lookup",
+      "phase_1_count": 6,
+      "phase_2_count": 6,
+      "accuracy_correct_rate_delta": 0.0,
+      "latest_state_correct_rate_delta": 0.0,
+      "contradiction_resolved_rate_delta": null
+    },
+    {
+      "system": "rag",
+      "category": "synthesis",
+      "phase_1_count": 6,
+      "phase_2_count": 6,
+      "accuracy_correct_rate_delta": 0.0,
+      "latest_state_correct_rate_delta": 0.0,
+      "contradiction_resolved_rate_delta": null
+    },
+    {
+      "system": "wiki",
+      "category": "contradiction",
+      "phase_1_count": 6,
+      "phase_2_count": 6,
+      "accuracy_correct_rate_delta": 0.0,
+      "latest_state_correct_rate_delta": 0.0,
+      "contradiction_resolved_rate_delta": null
+    },
+    {
+      "system": "wiki",
+      "category": "latest_state",
+      "phase_1_count": 6,
+      "phase_2_count": 6,
+      "accuracy_correct_rate_delta": 0.0,
+      "latest_state_correct_rate_delta": 0.0,
+      "contradiction_resolved_rate_delta": null
+    },
+    {
+      "system": "wiki",
+      "category": "lookup",
+      "phase_1_count": 6,
+      "phase_2_count": 6,
+      "accuracy_correct_rate_delta": 0.0,
+      "latest_state_correct_rate_delta": 0.0,
+      "contradiction_resolved_rate_delta": null
+    },
+    {
+      "system": "wiki",
+      "category": "synthesis",
+      "phase_1_count": 6,
+      "phase_2_count": 6,
+      "accuracy_correct_rate_delta": 0.0,
+      "latest_state_correct_rate_delta": 0.0,
+      "contradiction_resolved_rate_delta": null
+    }
+  ]
+}

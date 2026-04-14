@@ -1,0 +1,62 @@
+[
+  {
+    "doc_id": "042_policy_008",
+    "chunk_id": "042_policy_008:0",
+    "text": "doc_id: 042\nsource: policy\ntitle: Benchmark corpus policy document 8\nsummary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.\ndetails: Record 8 from policy is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/042_policy_008.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 281
+    },
+    "score": 0.39160895347595215
+  },
+  {
+    "doc_id": "038_policy_004",
+    "chunk_id": "038_policy_004:0",
+    "text": "doc_id: 038\nsource: policy\ntitle: Benchmark corpus policy document 4\nsummary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.\ndetails: Record 4 from policy is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/038_policy_004.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 281
+    },
+    "score": 0.39160895347595215
+  },
+  {
+    "doc_id": "045_policy_011",
+    "chunk_id": "045_policy_011:0",
+    "text": "doc_id: 045\nsource: policy\ntitle: Benchmark corpus policy document 11\nsummary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.\ndetails: Record 11 from policy is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/045_policy_011.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 283
+    },
+    "score": 0.39160895347595215
+  },
+  {
+    "doc_id": "036_policy_002",
+    "chunk_id": "036_policy_002:0",
+    "text": "doc_id: 036\nsource: policy\ntitle: Benchmark corpus policy document 2\nsummary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.\ndetails: Record 2 from policy is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/036_policy_002.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 281
+    },
+    "score": 0.33136141300201416
+  },
+  {
+    "doc_id": "037_policy_003",
+    "chunk_id": "037_policy_003:0",
+    "text": "doc_id: 037\nsource: policy\ntitle: Benchmark corpus policy document 3\nsummary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.\ndetails: Record 3 from policy is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/037_policy_003.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 281
+    },
+    "score": 0.33136141300201416
+  }
+]

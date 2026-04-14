@@ -1,0 +1,46 @@
+You are answering a question strictly from provided context chunks.
+Rules:
+1) Answer only from the context below.
+2) If context is insufficient, reply exactly: INSUFFICIENT_EVIDENCE.
+3) Do not invent latest-state, current-status, or time-sensitive claims unless directly supported by context.
+
+Question:
+From available filing revisions, what is the latest reported fiscal-year revenue trend for the company?
+
+Context:
+[chunk_id=079_financial_clean_012:0 | doc_id=079_financial_clean_012 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/079_financial_clean_012.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 319}]
+doc_id: 079
+source: financial_clean
+title: Benchmark corpus financial_clean document 12
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 12 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=080_financial_clean_013:0 | doc_id=080_financial_clean_013 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/080_financial_clean_013.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 319}]
+doc_id: 080
+source: financial_clean
+title: Benchmark corpus financial_clean document 13
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 13 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=076_financial_clean_009:0 | doc_id=076_financial_clean_009 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/076_financial_clean_009.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 317}]
+doc_id: 076
+source: financial_clean
+title: Benchmark corpus financial_clean document 9
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 9 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=057_policy_023:0 | doc_id=057_policy_023 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/057_policy_023.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 283}]
+doc_id: 057
+source: policy
+title: Benchmark corpus policy document 23
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 23 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=051_policy_017:0 | doc_id=051_policy_017 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/051_policy_017.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 283}]
+doc_id: 051
+source: policy
+title: Benchmark corpus policy document 17
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 17 from policy is included to provide reproducible corpus ordering and stable file names.
+
+Answer:

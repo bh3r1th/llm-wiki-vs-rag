@@ -1,0 +1,15 @@
+{
+  "run_id": "contradiction_06::phase=phase_1-20260414T013757.016105Z-9bf1ce14",
+  "query_id": "contradiction_06::phase=phase_1",
+  "mode": "rag",
+  "question": "Determine whether there is a contradiction between research claims of interpretability and policy requirements for explainability audits.",
+  "requested_top_k": 5,
+  "returned_top_k": 5,
+  "corpus_snapshot": "sha256:c7269e7838752fae8d84086a0247035530cb865ad03748eada116cf49b3144df",
+  "execution_fingerprint": "sha256:abd641d4f6cc4503d599e0b1e7d4b40237a55d5690829806608524a2311509c0",
+  "token_usage": {
+    "prompt_tokens": 1,
+    "completion_tokens": 1,
+    "total_tokens": 2
+  }
+}

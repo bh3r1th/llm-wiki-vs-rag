@@ -1,0 +1,46 @@
+You are answering a question strictly from provided context chunks.
+Rules:
+1) Answer only from the context below.
+2) If context is insufficient, reply exactly: INSUFFICIENT_EVIDENCE.
+3) Do not invent latest-state, current-status, or time-sensitive claims unless directly supported by context.
+
+Question:
+What section of a financial filing usually contains the Management's Discussion and Analysis (MD&A)?
+
+Context:
+[chunk_id=098_financial_clean_031:0 | doc_id=098_financial_clean_031 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/098_financial_clean_031.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 319}]
+doc_id: 098
+source: financial_clean
+title: Benchmark corpus financial_clean document 31
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 31 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=065_policy_031:0 | doc_id=065_policy_031 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/065_policy_031.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 283}]
+doc_id: 065
+source: policy
+title: Benchmark corpus policy document 31
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 31 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=092_financial_clean_025:0 | doc_id=092_financial_clean_025 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/092_financial_clean_025.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 319}]
+doc_id: 092
+source: financial_clean
+title: Benchmark corpus financial_clean document 25
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 25 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=059_policy_025:0 | doc_id=059_policy_025 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/059_policy_025.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 283}]
+doc_id: 059
+source: policy
+title: Benchmark corpus policy document 25
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 25 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=088_financial_clean_021:0 | doc_id=088_financial_clean_021 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/088_financial_clean_021.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 319}]
+doc_id: 088
+source: financial_clean
+title: Benchmark corpus financial_clean document 21
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 21 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+Answer:

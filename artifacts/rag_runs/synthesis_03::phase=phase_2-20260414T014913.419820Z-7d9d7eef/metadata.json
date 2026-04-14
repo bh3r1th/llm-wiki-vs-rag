@@ -1,0 +1,15 @@
+{
+  "run_id": "synthesis_03::phase=phase_2-20260414T014913.419820Z-7d9d7eef",
+  "query_id": "synthesis_03::phase=phase_2",
+  "mode": "rag",
+  "question": "Using arXiv and policy sources, summarize how data privacy constraints can affect machine learning deployment decisions.",
+  "requested_top_k": 5,
+  "returned_top_k": 5,
+  "corpus_snapshot": "sha256:cae00552d584dab977334580d5001bc8478f4b904d76abfb7b80c24709ee4fc0",
+  "execution_fingerprint": "sha256:abd641d4f6cc4503d599e0b1e7d4b40237a55d5690829806608524a2311509c0",
+  "token_usage": {
+    "prompt_tokens": 1,
+    "completion_tokens": 1,
+    "total_tokens": 2
+  }
+}

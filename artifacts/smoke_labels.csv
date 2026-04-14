@@ -1,0 +1,1 @@
+system,query_id,phase,category,question,answer,corpus_snapshot,execution_fingerprint,accuracy,synthesis,latest_state,contradiction_detected,contradiction_resolved,compression_loss,provenance_fidelity,evaluator_notes

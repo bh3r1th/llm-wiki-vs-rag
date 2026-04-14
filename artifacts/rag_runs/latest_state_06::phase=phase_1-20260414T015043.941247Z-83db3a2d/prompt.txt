@@ -1,0 +1,46 @@
+You are answering a question strictly from provided context chunks.
+Rules:
+1) Answer only from the context below.
+2) If context is insufficient, reply exactly: INSUFFICIENT_EVIDENCE.
+3) Do not invent latest-state, current-status, or time-sensitive claims unless directly supported by context.
+
+Question:
+From the most recent corpus evidence, what is the current definition of material cybersecurity incident reporting timelines?
+
+Context:
+[chunk_id=100_financial_clean_033:0 | doc_id=100_financial_clean_033 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/100_financial_clean_033.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 319}]
+doc_id: 100
+source: financial_clean
+title: Benchmark corpus financial_clean document 33
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 33 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=067_policy_033:0 | doc_id=067_policy_033 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/067_policy_033.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 283}]
+doc_id: 067
+source: policy
+title: Benchmark corpus policy document 33
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 33 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=052_policy_018:0 | doc_id=052_policy_018 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/052_policy_018.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 283}]
+doc_id: 052
+source: policy
+title: Benchmark corpus policy document 18
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 18 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=085_financial_clean_018:0 | doc_id=085_financial_clean_018 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/085_financial_clean_018.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 319}]
+doc_id: 085
+source: financial_clean
+title: Benchmark corpus financial_clean document 18
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 18 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=071_financial_clean_004:0 | doc_id=071_financial_clean_004 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/071_financial_clean_004.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 317}]
+doc_id: 071
+source: financial_clean
+title: Benchmark corpus financial_clean document 4
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 4 from financial_clean is included to provide reproducible corpus ordering and stable file names.
+
+Answer:

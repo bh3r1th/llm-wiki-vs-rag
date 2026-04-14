@@ -1,0 +1,10 @@
+{
+  "pages_to_create": [
+    {
+      "title": "mock page",
+      "summary": "mock summary",
+      "content": "mock content"
+    }
+  ],
+  "pages_to_update": []
+}

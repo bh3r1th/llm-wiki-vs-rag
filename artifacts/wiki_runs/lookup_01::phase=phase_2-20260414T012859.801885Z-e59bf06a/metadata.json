@@ -1,0 +1,15 @@
+{
+  "query_id": "lookup_01::phase=phase_2",
+  "run_id": "lookup_01::phase=phase_2-20260414T012859.801885Z-e59bf06a",
+  "mode": "wiki",
+  "used_context_ids": [
+    "mock-page"
+  ],
+  "corpus_snapshot": "sha256:cae00552d584dab977334580d5001bc8478f4b904d76abfb7b80c24709ee4fc0",
+  "execution_fingerprint": "sha256:1277aeb887f7fc4f14e06d2eb9d4140f7fe16bbb87a4fb32040fb15581f58a3b",
+  "token_usage": {
+    "prompt_tokens": 1,
+    "completion_tokens": 1,
+    "total_tokens": 2
+  }
+}

@@ -1,0 +1,8 @@
+{"query_id": "lookup_01", "question": "What is the title of the arXiv paper that introduces the Transformer architecture?", "category": "lookup", "phase": "phase_1"}
+{"query_id": "lookup_02", "question": "Which SEC filing form is typically used for annual reports by U.S. public companies?", "category": "lookup", "phase": "phase_1"}
+{"query_id": "synthesis_01", "question": "Synthesize key differences between model pretraining objectives described in arXiv papers and governance controls described in policy documents.", "category": "synthesis", "phase": "phase_1"}
+{"query_id": "synthesis_02", "question": "Combine evidence from a company risk policy and its annual filing to summarize the organization's top operational risk themes.", "category": "synthesis", "phase": "phase_1"}
+{"query_id": "latest_state_01", "question": "Based on the latest dated corpus documents, what is the most current stated policy on retaining customer support transcripts?", "category": "latest_state", "phase": "phase_1"}
+{"query_id": "latest_state_02", "question": "From available filing revisions, what is the latest reported fiscal-year revenue trend for the company?", "category": "latest_state", "phase": "phase_1"}
+{"query_id": "contradiction_01", "question": "Identify any contradiction between arXiv claims of model robustness and policy constraints on acceptable model failure rates.", "category": "contradiction", "phase": "phase_1"}
+{"query_id": "contradiction_02", "question": "Find contradictions between risk disclosures in financial filings and internal policy statements about system availability commitments.", "category": "contradiction", "phase": "phase_1"}

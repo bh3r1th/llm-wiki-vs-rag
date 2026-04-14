@@ -1,0 +1,15 @@
+{
+  "query_id": "synthesis_06::phase=phase_1",
+  "run_id": "synthesis_06::phase=phase_1-20260414T014910.296962Z-4e6cbcd0",
+  "mode": "wiki",
+  "used_context_ids": [
+    "mock-page"
+  ],
+  "corpus_snapshot": "sha256:c7269e7838752fae8d84086a0247035530cb865ad03748eada116cf49b3144df",
+  "execution_fingerprint": "sha256:1277aeb887f7fc4f14e06d2eb9d4140f7fe16bbb87a4fb32040fb15581f58a3b",
+  "token_usage": {
+    "prompt_tokens": 1,
+    "completion_tokens": 1,
+    "total_tokens": 2
+  }
+}

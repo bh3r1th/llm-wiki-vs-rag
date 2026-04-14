@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-04-14T01:37:58.016737+00:00",
+  "ingest_run_id": "sha256_c7269e7838752fae8d84086a0247035530cb865ad03748eada116cf49b3144df-20260414T013757.964129Z-1163204b",
+  "corpus_snapshot": "sha256:c7269e7838752fae8d84086a0247035530cb865ad03748eada116cf49b3144df",
+  "doc_id": "006_arxiv_006",
+  "pages_created": [
+    "mock page"
+  ],
+  "pages_updated": []
+}

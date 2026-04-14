@@ -1,0 +1,9 @@
+dimension,key,total,labeled_total,accuracy_correct_pct,latest_state_correct_pct,contradiction_resolved_pct,avg_latency_ms,avg_total_tokens
+system,rag,48,48,12.5,87.5,N/A,120.374,2.0
+system,wiki,48,48,100.0,100.0,N/A,2.215,2.0
+phase,phase_1,48,48,62.5,100.0,N/A,59.479,2.0
+phase,phase_2,48,48,50.0,87.5,N/A,63.11,2.0
+category,contradiction,24,24,50.0,100.0,N/A,80.544,2.0
+category,latest_state,24,24,75.0,75.0,N/A,61.896,2.0
+category,lookup,24,24,50.0,100.0,N/A,39.231,2.0
+category,synthesis,24,24,50.0,100.0,N/A,63.507,2.0

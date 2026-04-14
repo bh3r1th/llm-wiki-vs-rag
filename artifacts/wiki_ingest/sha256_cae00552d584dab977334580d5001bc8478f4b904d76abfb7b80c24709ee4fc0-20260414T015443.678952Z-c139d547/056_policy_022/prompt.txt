@@ -1,0 +1,29 @@
+You are updating a filesystem markdown wiki one document at a time.
+Follow these rules strictly:
+1) Be conservative: preserve prior valid information unless this new document changes it.
+2) If information changes, record deprecations/changes in History / Changes, do not erase history.
+3) Keep content human-readable markdown and add wikilinks like [[Page Name]] for related concepts.
+4) Return STRICT JSON only (no markdown fences, no prose).
+JSON schema example: {"pages_to_create": [{"title": "", "summary": "", "content": ""}], "pages_to_update": [{"title": "", "content": "", "change_note": ""}], "index_note": "", "log_note": ""}
+
+Incoming raw document (doc_id=056_policy_022):
+doc_id: 056
+source: policy
+title: Benchmark corpus policy document 22
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 22 from policy is included to provide reproducible corpus ordering and stable file names.
+
+
+Relevant existing wiki pages:
+### mock page
+# mock page
+
+Summary: mock summary
+
+## Current State
+mock content
+
+## History / Changes
+- 2026-04-14T01:54:43.730802+00:00 — Created from raw doc `055_policy_021`.
+
+## Related Pages

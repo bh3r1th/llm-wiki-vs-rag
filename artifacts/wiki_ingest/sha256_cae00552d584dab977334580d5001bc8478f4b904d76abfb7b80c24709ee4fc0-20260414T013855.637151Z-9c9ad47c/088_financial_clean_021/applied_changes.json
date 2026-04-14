@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-04-14T01:38:55.998295+00:00",
+  "ingest_run_id": "sha256_cae00552d584dab977334580d5001bc8478f4b904d76abfb7b80c24709ee4fc0-20260414T013855.637151Z-9c9ad47c",
+  "corpus_snapshot": "sha256:cae00552d584dab977334580d5001bc8478f4b904d76abfb7b80c24709ee4fc0",
+  "doc_id": "088_financial_clean_021",
+  "pages_created": [
+    "mock page"
+  ],
+  "pages_updated": []
+}

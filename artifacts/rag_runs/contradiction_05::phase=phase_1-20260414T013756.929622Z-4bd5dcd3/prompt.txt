@@ -1,0 +1,46 @@
+You are answering a question strictly from provided context chunks.
+Rules:
+1) Answer only from the context below.
+2) If context is insufficient, reply exactly: INSUFFICIENT_EVIDENCE.
+3) Do not invent latest-state, current-status, or time-sensitive claims unless directly supported by context.
+
+Question:
+Check whether governance documents contradict filing disclosures about incident disclosure speed and escalation thresholds.
+
+Context:
+[chunk_id=025_arxiv_025:0 | doc_id=025_arxiv_025 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/025_arxiv_025.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 279}]
+doc_id: 025
+source: arxiv
+title: Benchmark corpus arxiv document 25
+summary: This reconstructed benchmark document captures arxiv evidence for deterministic phase splitting.
+details: Record 25 from arxiv is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=011_arxiv_011:0 | doc_id=011_arxiv_011 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/011_arxiv_011.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 279}]
+doc_id: 011
+source: arxiv
+title: Benchmark corpus arxiv document 11
+summary: This reconstructed benchmark document captures arxiv evidence for deterministic phase splitting.
+details: Record 11 from arxiv is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=035_policy_001:0 | doc_id=035_policy_001 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/035_policy_001.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 281}]
+doc_id: 035
+source: policy
+title: Benchmark corpus policy document 1
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 1 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=007_arxiv_007:0 | doc_id=007_arxiv_007 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/007_arxiv_007.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 277}]
+doc_id: 007
+source: arxiv
+title: Benchmark corpus arxiv document 7
+summary: This reconstructed benchmark document captures arxiv evidence for deterministic phase splitting.
+details: Record 7 from arxiv is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=027_arxiv_027:0 | doc_id=027_arxiv_027 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/027_arxiv_027.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 279}]
+doc_id: 027
+source: arxiv
+title: Benchmark corpus arxiv document 27
+summary: This reconstructed benchmark document captures arxiv evidence for deterministic phase splitting.
+details: Record 27 from arxiv is included to provide reproducible corpus ordering and stable file names.
+
+Answer:

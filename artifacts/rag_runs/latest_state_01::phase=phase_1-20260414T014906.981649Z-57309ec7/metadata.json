@@ -1,0 +1,15 @@
+{
+  "run_id": "latest_state_01::phase=phase_1-20260414T014906.981649Z-57309ec7",
+  "query_id": "latest_state_01::phase=phase_1",
+  "mode": "rag",
+  "question": "Based on the latest dated corpus documents, what is the most current stated policy on retaining customer support transcripts?",
+  "requested_top_k": 5,
+  "returned_top_k": 5,
+  "corpus_snapshot": "sha256:c7269e7838752fae8d84086a0247035530cb865ad03748eada116cf49b3144df",
+  "execution_fingerprint": "sha256:abd641d4f6cc4503d599e0b1e7d4b40237a55d5690829806608524a2311509c0",
+  "token_usage": {
+    "prompt_tokens": 1,
+    "completion_tokens": 1,
+    "total_tokens": 2
+  }
+}

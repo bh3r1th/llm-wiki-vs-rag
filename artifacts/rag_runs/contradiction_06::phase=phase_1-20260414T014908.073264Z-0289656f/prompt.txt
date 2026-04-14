@@ -1,0 +1,46 @@
+You are answering a question strictly from provided context chunks.
+Rules:
+1) Answer only from the context below.
+2) If context is insufficient, reply exactly: INSUFFICIENT_EVIDENCE.
+3) Do not invent latest-state, current-status, or time-sensitive claims unless directly supported by context.
+
+Question:
+Determine whether there is a contradiction between research claims of interpretability and policy requirements for explainability audits.
+
+Context:
+[chunk_id=042_policy_008:0 | doc_id=042_policy_008 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/042_policy_008.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 281}]
+doc_id: 042
+source: policy
+title: Benchmark corpus policy document 8
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 8 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=038_policy_004:0 | doc_id=038_policy_004 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/038_policy_004.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 281}]
+doc_id: 038
+source: policy
+title: Benchmark corpus policy document 4
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 4 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=045_policy_011:0 | doc_id=045_policy_011 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/045_policy_011.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 283}]
+doc_id: 045
+source: policy
+title: Benchmark corpus policy document 11
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 11 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=036_policy_002:0 | doc_id=036_policy_002 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/036_policy_002.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 281}]
+doc_id: 036
+source: policy
+title: Benchmark corpus policy document 2
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 2 from policy is included to provide reproducible corpus ordering and stable file names.
+
+[chunk_id=037_policy_003:0 | doc_id=037_policy_003 | source=/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/037_policy_003.txt | pos={'chunk_index': 0, 'start_char': 0, 'end_char': 281}]
+doc_id: 037
+source: policy
+title: Benchmark corpus policy document 3
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 3 from policy is included to provide reproducible corpus ordering and stable file names.
+
+Answer:

@@ -1,0 +1,62 @@
+[
+  {
+    "doc_id": "073_financial_clean_006",
+    "chunk_id": "073_financial_clean_006:0",
+    "text": "doc_id: 073\nsource: financial_clean\ntitle: Benchmark corpus financial_clean document 6\nsummary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.\ndetails: Record 6 from financial_clean is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/073_financial_clean_006.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 317
+    },
+    "score": 0.08304548263549805
+  },
+  {
+    "doc_id": "086_financial_clean_019",
+    "chunk_id": "086_financial_clean_019:0",
+    "text": "doc_id: 086\nsource: financial_clean\ntitle: Benchmark corpus financial_clean document 19\nsummary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.\ndetails: Record 19 from financial_clean is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/086_financial_clean_019.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 319
+    },
+    "score": 0.08304548263549805
+  },
+  {
+    "doc_id": "077_financial_clean_010",
+    "chunk_id": "077_financial_clean_010:0",
+    "text": "doc_id: 077\nsource: financial_clean\ntitle: Benchmark corpus financial_clean document 10\nsummary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.\ndetails: Record 10 from financial_clean is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/077_financial_clean_010.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 319
+    },
+    "score": 0.04152274131774902
+  },
+  {
+    "doc_id": "078_financial_clean_011",
+    "chunk_id": "078_financial_clean_011:0",
+    "text": "doc_id: 078\nsource: financial_clean\ntitle: Benchmark corpus financial_clean document 11\nsummary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.\ndetails: Record 11 from financial_clean is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/078_financial_clean_011.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 319
+    },
+    "score": 0.04152274131774902
+  },
+  {
+    "doc_id": "079_financial_clean_012",
+    "chunk_id": "079_financial_clean_012:0",
+    "text": "doc_id: 079\nsource: financial_clean\ntitle: Benchmark corpus financial_clean document 12\nsummary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.\ndetails: Record 12 from financial_clean is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/079_financial_clean_012.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 319
+    },
+    "score": 0.04152274131774902
+  }
+]

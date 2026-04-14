@@ -1,0 +1,24 @@
+You are answering a question strictly from provided wiki context.
+Rules:
+1) Answer only from the wiki context below.
+2) If context is insufficient, reply exactly: INSUFFICIENT_EVIDENCE.
+3) Do not invent latest-state, current-status, or time-sensitive claims unless directly supported by context.
+
+Question:
+Across policy updates and filings, what is the latest disclosed stance on third-party AI vendor risk?
+
+Wiki context:
+[mock page]
+# mock page
+
+Summary: mock summary
+
+## Current State
+mock content
+
+## History / Changes
+- 2026-04-14T01:58:59.090339+00:00 — Created from raw doc `100_financial_clean_033`.
+
+## Related Pages
+
+Answer:

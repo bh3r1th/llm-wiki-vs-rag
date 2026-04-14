@@ -1,0 +1,62 @@
+[
+  {
+    "doc_id": "025_arxiv_025",
+    "chunk_id": "025_arxiv_025:0",
+    "text": "doc_id: 025\nsource: arxiv\ntitle: Benchmark corpus arxiv document 25\nsummary: This reconstructed benchmark document captures arxiv evidence for deterministic phase splitting.\ndetails: Record 25 from arxiv is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/025_arxiv_025.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 279
+    },
+    "score": 0.1357688456773758
+  },
+  {
+    "doc_id": "011_arxiv_011",
+    "chunk_id": "011_arxiv_011:0",
+    "text": "doc_id: 011\nsource: arxiv\ntitle: Benchmark corpus arxiv document 11\nsummary: This reconstructed benchmark document captures arxiv evidence for deterministic phase splitting.\ndetails: Record 11 from arxiv is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/011_arxiv_011.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 279
+    },
+    "score": 0.10527937114238739
+  },
+  {
+    "doc_id": "035_policy_001",
+    "chunk_id": "035_policy_001:0",
+    "text": "doc_id: 035\nsource: policy\ntitle: Benchmark corpus policy document 1\nsummary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.\ndetails: Record 1 from policy is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/035_policy_001.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 281
+    },
+    "score": 0.10350985825061798
+  },
+  {
+    "doc_id": "007_arxiv_007",
+    "chunk_id": "007_arxiv_007:0",
+    "text": "doc_id: 007\nsource: arxiv\ntitle: Benchmark corpus arxiv document 7\nsummary: This reconstructed benchmark document captures arxiv evidence for deterministic phase splitting.\ndetails: Record 7 from arxiv is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/007_arxiv_007.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 277
+    },
+    "score": 0.10182664543390274
+  },
+  {
+    "doc_id": "027_arxiv_027",
+    "chunk_id": "027_arxiv_027:0",
+    "text": "doc_id: 027\nsource: arxiv\ntitle: Benchmark corpus arxiv document 27\nsummary: This reconstructed benchmark document captures arxiv evidence for deterministic phase splitting.\ndetails: Record 27 from arxiv is included to provide reproducible corpus ordering and stable file names.",
+    "source_path": "/Users/bharathnunepalli/Downloads/llm-wiki-vs-rag/raw/027_arxiv_027.txt",
+    "position": {
+      "chunk_index": 0,
+      "start_char": 0,
+      "end_char": 279
+    },
+    "score": 0.07018624991178513
+  }
+]

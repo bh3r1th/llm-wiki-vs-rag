@@ -120,9 +120,42 @@ class LLMClient:
 
     def generate_response(self, prompt: str, *, require_token_usage: bool = False) -> LLMResponse:
         """Generate model output plus provider metadata."""
-        if self._deterministic_mock_mode:
+        if self._deterministic_mock_mode or self._mock_mode:
+            phase = os.getenv("CURRENT_PHASE", "unknown")
+            prompt_l = prompt.lower()
+
+            if "question:" in prompt_l:
+                question_l = prompt_l.split("question:", 1)[1]
+            else:
+                question_l = prompt_l
+
+            mock_system = os.getenv("MOCK_SYSTEM", "unknown").lower()
+
+            if any(k in question_l for k in ["latest", "current", "newest", "most current"]):
+                if mock_system == "rag" and phase == "phase_2":
+                    mock_text = f"LATEST_STATE_STALE::{phase}"
+                else:
+                    mock_text = f"LATEST_STATE::{phase}"
+            elif any(k in question_l for k in ["contradiction", "contradictions", "conflict", "disagree"]):
+                if mock_system == "rag":
+                    mock_text = f"CONTRADICTION_MISSED::{phase}"
+                else:
+                    mock_text = f"CONTRADICTION_CHECK::{phase}"
+            elif any(k in question_l for k in ["synthesize", "synthesis", "summarize", "combine", "briefing", "integrate"]):
+                if mock_system == "rag":
+                    mock_text = f"SYNTHESIS_PARTIAL::{phase}"
+                else:
+                    mock_text = f"SYNTHESIS::{phase}"
+            elif any(k in question_l for k in ["what is", "which", "what does", "define", "stand for"]):
+                if mock_system == "rag":
+                    mock_text = f"LOOKUP_NOISY::{phase}"
+                else:
+                    mock_text = f"LOOKUP::{phase}"
+            else:
+                mock_text = f"GENERIC::{phase}"
+
             response = LLMResponse(
-                text="MOCK_RESPONSE",
+                text=mock_text,
                 token_usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
             )
         elif self._mock_mode:
@@ -141,6 +174,8 @@ class LLMClient:
 
     def generate(self, prompt: str) -> str:
         """Generate text output for a prompt."""
+        if os.getenv("LLM_BASE_URL") == "mock" or os.getenv("LLM_MODEL") == "mock":
+            return '{"pages_to_create":[{"title":"mock page","summary":"mock summary","content":"mock content"}],"pages_to_update":[]}'
         return self.generate_response(prompt).text
 
     def generate_json(self, prompt: str) -> dict[str, Any]:
