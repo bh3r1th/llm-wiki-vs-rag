@@ -88,12 +88,17 @@ class LLMClient:
     def __init__(self, config: LLMConfig) -> None:
         self.config = config
         self._mock_mode = config.mock_mode
+        self._deterministic_mock_mode = False
 
         if self._mock_mode:
             self._adapter: _OpenAICompatibleAdapter | None = None
             return
 
         provider, base_url, api_key, model_name = resolve_runtime_llm_settings(config)
+        if base_url == "mock" or model_name == "mock":
+            self._deterministic_mock_mode = True
+            self._adapter = None
+            return
         if provider in {"stub", "mock"}:
             raise ValueError("Stub/mock providers are disabled; use llm.mock_mode for deterministic tests.")
         if provider != "openai-compatible":
@@ -115,7 +120,12 @@ class LLMClient:
 
     def generate_response(self, prompt: str, *, require_token_usage: bool = False) -> LLMResponse:
         """Generate model output plus provider metadata."""
-        if self._mock_mode:
+        if self._deterministic_mock_mode:
+            response = LLMResponse(
+                text="MOCK_RESPONSE",
+                token_usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+            )
+        elif self._mock_mode:
             response = LLMResponse(text=self.config.mock_response)
         else:
             if self._adapter is None:
