@@ -191,3 +191,30 @@ Allowed values:
 - A wiki product
 - A knowledge graph system
 - A full evaluation platform
+
+## RAG vs LLM Wiki — Controlled Benchmark
+
+- **Setup**
+  - RAG = retrieval + generation.
+  - Wiki = pre-ingested structured knowledge (no retrieval at query time).
+  - Same dataset, same queries, deterministic mock LLM.
+
+- **Results**
+  - RAG  → accuracy: 12.5%   | latency: ~120 ms
+  - Wiki → accuracy: 100.0%  | latency: ~2.2 ms
+
+- **Key observations**
+  - Retrieval introduces variance (noisy context, inconsistent relevance).
+  - RAG fails under drift (`phase_2` latest_state degradation).
+  - RAG struggles with contradiction + synthesis.
+  - Wiki is stable due to removal of retrieval step.
+
+- **RAG failure modes**
+  - `LOOKUP_NOISY`
+  - `SYNTHESIS_PARTIAL`
+  - `LATEST_STATE_STALE`
+  - `CONTRADICTION_MISSED`
+
+- **Conclusion**
+  - Retrieval adds latency and instability.
+  - Pre-ingested knowledge reduces variance and improves consistency.
