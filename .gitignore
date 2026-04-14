@@ -1,2 +1,11 @@
 __pycache__/
 *.pyc
+.DS_Store
+artifacts/tmp/
+artifacts/debug/
+artifacts/*_phase_*.jsonl
+artifacts/*v1*
+artifacts/*v2*
+artifacts/*v3*
+artifacts/*v4*
+artifacts/*v5*
