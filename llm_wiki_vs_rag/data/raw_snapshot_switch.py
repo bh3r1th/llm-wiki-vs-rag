@@ -19,8 +19,20 @@ def _phase_source_files(phase_dir: Path) -> list[Path]:
 
 
 def switch_phase_corpus(*, paths: ProjectPaths, phase: str, source_root: Path | None = None) -> Path:
-    source_base = (source_root or (paths.project_root / "data" / "raw")).resolve()
-    phase_dir = source_base / phase
+    dataset_root = (
+        source_root
+        if source_root is not None
+        else next(
+            (
+                candidate
+                for candidate in (paths.project_root / "data" / "raw", paths.project_root / "data")
+                if (candidate / phase).is_dir()
+            ),
+            paths.project_root / "data" / "raw",
+        )
+    ).resolve()
+    phase_dir = dataset_root / phase
+    print(f"[switch-phase-corpus] resolved source phase path: {phase_dir}")
     if not phase_dir.exists() or not phase_dir.is_dir():
         raise ValueError(f"Missing source phase directory: {phase_dir}")
 
