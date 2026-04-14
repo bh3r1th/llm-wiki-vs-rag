@@ -1,0 +1,5 @@
+doc_id: 074
+source: financial_clean
+title: Benchmark corpus financial_clean document 7
+summary: This reconstructed benchmark document captures financial_clean evidence for deterministic phase splitting.
+details: Record 7 from financial_clean is included to provide reproducible corpus ordering and stable file names.

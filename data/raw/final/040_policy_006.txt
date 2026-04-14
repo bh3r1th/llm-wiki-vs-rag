@@ -1,0 +1,5 @@
+doc_id: 040
+source: policy
+title: Benchmark corpus policy document 6
+summary: This reconstructed benchmark document captures policy evidence for deterministic phase splitting.
+details: Record 6 from policy is included to provide reproducible corpus ordering and stable file names.

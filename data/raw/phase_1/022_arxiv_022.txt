@@ -1,0 +1,5 @@
+doc_id: 022
+source: arxiv
+title: Benchmark corpus arxiv document 22
+summary: This reconstructed benchmark document captures arxiv evidence for deterministic phase splitting.
+details: Record 22 from arxiv is included to provide reproducible corpus ordering and stable file names.
