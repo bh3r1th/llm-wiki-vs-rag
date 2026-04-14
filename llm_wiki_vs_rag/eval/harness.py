@@ -53,6 +53,17 @@ def load_phase_query_cases(path: Path, target_phase: str) -> list[EvalQueryCase]
         )
     lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     query_cases = [EvalQueryCase.model_validate(json.loads(line)) for line in lines]
+    validate_phase_query_contract(query_cases=query_cases, source=str(path), target_phase=target_phase)
+    return query_cases
+
+
+def validate_phase_query_contract(
+    *,
+    query_cases: list[EvalQueryCase],
+    source: str,
+    target_phase: str,
+) -> None:
+    """Validate benchmark query rows for one explicit phase only."""
     if not query_cases:
         raise ValueError("No query rows found in phase query file.")
     allowed_categories = {"lookup", "synthesis", "latest_state", "contradiction"}
@@ -60,7 +71,7 @@ def load_phase_query_cases(path: Path, target_phase: str) -> list[EvalQueryCase]
     if invalid_categories:
         raise ValueError(
             "Benchmark query categories must be one of "
-            f"{sorted(allowed_categories)}. source={path}, invalid_categories={invalid_categories}."
+            f"{sorted(allowed_categories)}. source={source}, invalid_categories={invalid_categories}."
         )
     mismatched = [case for case in query_cases if case.phase != target_phase]
     if mismatched:
@@ -69,16 +80,20 @@ def load_phase_query_cases(path: Path, target_phase: str) -> list[EvalQueryCase]
             f"target_phase={target_phase}, mismatch_sample="
             f"{[{'query_id': case.query_id, 'phase': case.phase} for case in mismatched[:5]]}."
         )
-    counts: dict[str, int] = {}
+    counts: dict[tuple[str, str], int] = {}
     for case in query_cases:
-        counts[case.query_id] = counts.get(case.query_id, 0) + 1
-    duplicate_query_ids = sorted(query_id for query_id, count in counts.items() if count > 1)
-    if duplicate_query_ids:
+        key = (case.query_id, case.phase)
+        counts[key] = counts.get(key, 0) + 1
+    duplicates = sorted(
+        {"query_id": query_id, "phase": phase, "count": count}
+        for (query_id, phase), count in counts.items()
+        if count > 1
+    )
+    if duplicates:
         raise ValueError(
-            "Phase-targeted benchmark query rows must be unique per query_id. "
-            f"source={path}, duplicate_query_id_sample={duplicate_query_ids[:5]}."
+            "Phase-targeted benchmark query rows must be unique per (query_id, phase). "
+            f"source={source}, duplicate_sample={duplicates[:5]}."
         )
-    return query_cases
 
 
 def build_smoke_query_subset(
@@ -446,7 +461,11 @@ def _run_phase_queries_for_system(
     system: str,
     phase: str,
 ) -> list[RunOutputRecord]:
-    validate_benchmark_query_contract(query_cases=query_cases, source=f"<{system}:{phase}>")
+    validate_phase_query_contract(
+        query_cases=query_cases,
+        source=f"<{system}:{phase}>",
+        target_phase=phase,
+    )
     return run_queries_for_system(
         config=config,
         paths=paths,

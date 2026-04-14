@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 
 from llm_wiki_vs_rag.config import AppConfig
-from llm_wiki_vs_rag.eval.harness import load_query_cases
+from llm_wiki_vs_rag.eval.harness import load_query_cases, run_phase_1_rag_queries
+from llm_wiki_vs_rag.eval.models import EvalQueryCase, RunOutputRecord
+from llm_wiki_vs_rag.paths import ProjectPaths
 from llm_wiki_vs_rag.runner import run_command
 
 
@@ -94,3 +96,38 @@ def test_validate_queries_command_runs_loader_contract_checks(tmp_path):
     )
 
     run_command("validate-queries", AppConfig(project_root=tmp_path), query_file=str(query_file))
+
+
+def test_phase_specific_runner_accepts_single_phase_query_file(monkeypatch, tmp_path):
+    single_phase_rows = [
+        {"query_id": "q1", "phase": "phase_1", "question": "Q1?", "category": "lookup"},
+        {"query_id": "q2", "phase": "phase_1", "question": "Q2?", "category": "synthesis"},
+    ]
+    query_cases = [EvalQueryCase.model_validate(row) for row in single_phase_rows]
+
+    def _fake_run_queries_for_system(**_kwargs):
+        return [
+            RunOutputRecord(
+                query_id="q1",
+                system="rag",
+                phase="phase_1",
+                question="Q1?",
+                category="lookup",
+                answer="A1",
+                metadata={
+                    "execution_fingerprint": "sha256:exec",
+                    "corpus_snapshot": "sha256:snap",
+                    "corpus_order": "001",
+                },
+            )
+        ]
+
+    monkeypatch.setattr("llm_wiki_vs_rag.eval.harness.run_queries_for_system", _fake_run_queries_for_system)
+
+    records = run_phase_1_rag_queries(
+        config=AppConfig(project_root=tmp_path),
+        paths=ProjectPaths(tmp_path),
+        query_cases=query_cases,
+    )
+
+    assert len(records) == 1
