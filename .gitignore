@@ -9,3 +9,5 @@ artifacts/*v2*
 artifacts/*v3*
 artifacts/*v4*
 artifacts/*v5*
+*.bak
+*.bak*
